@@ -23,9 +23,12 @@ void debug(char *str) {
 
 // Mètode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
-	char cwd[PATH_MAX];
+	char cwd[LINE_MAX_LEN];
 	const char* user = getenv("USER"); // Es defineix el nom del 'user'
-	if (!user) user = "user"; // En cas de que l'usuari no sigui 'user'
+	
+	if (user == NULL)
+		user = "user"; // En cas de que l'usuari no sigui 'user'
+
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		strncpy(cwd, "?", sizeof(cwd));
 		cwd[sizeof(cwd) - 1] = '\0';
@@ -41,68 +44,37 @@ void print_prompt(void) {
 	fflush(stdout);
 }
 
-char *read_line(char *line) {
+char *read_line(char *line, size_t len) {
 	print_prompt();
 
-	char buff[LINE_MAX_LEN];
-	if (fgets(buff, sizeof(buff) / sizeof(char), stdin) == NULL) {
+	if (fgets(line, len, stdin) == NULL) {
 		if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
 			debug("[read_line] exit\n");
-			exit(0);
+			exit(EXIT_SUCCESS);
 		} else {
 			return NULL;
 		}
 	}
 
-	char *newline = strchr(buff, '\n');
+	char *newline = strchr(line, '\n');
 	if (newline != NULL) // Eliminam la newline final, si n'hi ha
 		*newline = '\0';
 
-	return buff; // TODO!!!!!!!!
+	return line;
 }
 
 int parse_line(char* line, char** argv, int max_args) {
 	int argc = 0;
 	const char* delim = " \t\n";
 	char* token = strtok(line, delim);
+
 	while (token != NULL && argc < max_args - 1) {
 		argv[argc++] = token;
 		token = strtok(NULL, delim);
 	}
-	argv[argc] = NULL
+
+	argv[argc] = NULL;
 	return argc;
-}
-
-int execute_line(char* line) {};
-
-int check_internal(char** args) {
-	if (args == NULL || args[0] == NULL) return 0;
-
-
-	if (strcmp(args[0], "exit") == 0) { // Comanda per a sortir del programa
-		printf("Bye Bye\n");
-		exit(EXIT_SUCCESS);
-	}
-	// Altres comandes sense funcionalitat temporalment
-	else if (strcmp(args[0], "cd") == 0) {
-		return internal_cd(args);
-	}
-	else if (strcmp(args[0], "export") == 0) {
-		return internal_export(args);
-	}
-	else if (strcmp(args[0], "source") == 0) {
-		return internal_source(args);
-	}
-	else if (strcmp(args[0], "jobs") == 0) {
-		return internal_jobs(args);
-	}
-	else if (strcmp(args[0], "fg") == 0) {
-		return internal_fg(args);
-	}
-	else if (strcmp(args[0], "bg") == 0) {
-		return internal_bg(args);
-	}
-	return 0;
 }
 
 int internal_cd(char** args) {};
@@ -117,69 +89,50 @@ int internal_fg(char** args) {};
 
 int internal_bg(char** args) {};
 
+int check_internal(char** args) {
+	if (args == NULL || args[0] == NULL)
+		return 0;
 
-// Mètode main del programa que inclou el bucle principal temporal per a 
-// imprimir les comandes de l'usuari i sortir del programa
-int main(int argc, char* argv[]) {
-	if (strcmp(args[0], "exit") == 0) {
-		printf("%sCerrando minishell. Hasta luego!%s\n", ANSI_YELLOW, ANSI_RESET);
-		break;
+	if (strcmp(args[0], "exit") == 0) { // Comanda per a sortir del programa
+		printf("Bye Bye\n");
+		exit(EXIT_SUCCESS);
 	}
+
+	// Altres comandes sense funcionalitat temporalment
 	else if (strcmp(args[0], "cd") == 0) {
-		printf("%s[internal] cd -> cambiar directorio a: %s%s\n",
-			ANSI_YELLOW,
-			(argcount > 1 ? args[1] : "(HOME)"),
-			ANSI_RESET);
-		continue;
-	}
-	else if (strcmp(args[0], "export") == 0) {
-		printf("%s[internal] export -> establecer variable de entorno: %s%s\n",
-			ANSI_YELLOW,
-			(argcount > 1 ? args[1] : "(none)"),
-			ANSI_RESET);
-		continue;
-	}
-	else if (strcmp(args[0], "source") == 0) {
-		printf("%s[internal] source -> ejecutar comandos desde archivo: %s%s\n",
-			ANSI_YELLOW,
-			(argcount > 1 ? args[1] : "(none)"),
-			ANSI_RESET);
-		continue;
-	}
-	else if (strcmp(args[0], "jobs") == 0) {
-		printf("%s[internal] jobs -> listar trabajos en background (placeholder)%s\n",
-			ANSI_YELLOW, ANSI_RESET);
-		continue;
-	}
-	else if (strcmp(args[0], "fg") == 0) {
-		printf("%s[internal] fg -> traer trabajo al foreground (placeholder)%s\n",
-			ANSI_YELLOW, ANSI_RESET);
-		continue;
-	}
-	else if (strcmp(args[0], "bg") == 0) {
-		printf("%s[internal] bg -> enviar trabajo a background (placeholder)%s\n",
-			ANSI_YELLOW, ANSI_RESET);
-		continue;
+		return internal_cd(args);
+	} else if (strcmp(args[0], "export") == 0) {
+		return internal_export(args);
+	} else if (strcmp(args[0], "source") == 0) {
+		return internal_source(args);
+	} else if (strcmp(args[0], "jobs") == 0) {
+		return internal_jobs(args);
+	} else if (strcmp(args[0], "fg") == 0) {
+		return internal_fg(args);
+	} else if (strcmp(args[0], "bg") == 0) {
+		return internal_bg(args);
 	}
 
-	pid_t pid = fork();
-	if (pid < 0) {
-		perror("fork");
-		continue;
-	}
-	if (pid == 0) {
-		execvp(args[0], args);
-		perror("execvp");
-		_exit(EXIT_FAILURE);
-	}
-	else {
-		int status;
-		if (waitpid(pid, &status, 0) < 0) {
-			perror("waitpid");
-		}
-	}
+	return 0;
 }
 
+int execute_line(char* line) {
+	char *argv[MAX_ARGS];
+	int argc = parse_line(line, argv, MAX_ARGS);
 
-return 0;
+	if (argc == 0)
+		return 0;
+
+	check_internal(argv);
+	return 1;
+}
+
+int main(void) {
+	while (1) {
+		char line[LINE_MAX_LEN];
+		if (read_line(line, sizeof(line) / sizeof(char)) == NULL)
+			continue;
+
+		execute_line(line);
+	}
 }
