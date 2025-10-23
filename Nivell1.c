@@ -50,6 +50,9 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
+
+// Mètode main del programa que inclou el bucle principal temporal per a 
+// imprimir les comandes de l'usuari i sortir del programa
 int main(int argc, char* argv[]) {
 	if (strcmp(args[0], "exit") == 0) {
 		printf("%sCerrando minishell. Hasta luego!%s\n", ANSI_YELLOW, ANSI_RESET);
