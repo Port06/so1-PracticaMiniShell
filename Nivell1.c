@@ -56,10 +56,11 @@ int check_internal(char** args) {
 	if (args == NULL || args[0] == NULL) return 0;
 
 
-	if (strcmp(args[0], "exit") == 0) {
+	if (strcmp(args[0], "exit") == 0) { // Comanda per a sortir del programa
 		printf("Bye Bye\n");
 		exit(EXIT_SUCCESS);
 	}
+	// Altres comandes sense funcionalitat temporalment
 	else if (strcmp(args[0], "cd") == 0) {
 		return internal_cd(args);
 	}
