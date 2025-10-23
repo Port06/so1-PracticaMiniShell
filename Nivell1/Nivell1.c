@@ -6,19 +6,19 @@
 #include <sys/wait.h>
 #include <limits.h>
 
-
+// Es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
 #define MAX_ARGS 64
 
-// Códigos ANSI para los colores e estilos del texto
-#define ANSI_BOLD "\x1b[1m"
-#define ANSI_RESET "\x1b[0m"
-#define ANSI_BLUE "\x1b[34m"
-#define ANSI_GREEN "\x1b[32m"
-#define ANSI_YELLOW "\x1b[33m"
+// Codis ansi per al estil i color del texte
+#define ANSI_BOLD "\x1b[1m" // Texte en negreta
+#define ANSI_RESET "\x1b[0m" // Reinicialització del format
+#define ANSI_BLUE "\x1b[34m" // Blau
+#define ANSI_GREEN "\x1b[32m" // Verd
+#define ANSI_YELLOW "\x1b[33m" // Groc
 
 
-
+// Mètode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
 	char cwd[PATH_MAX];
 	const char* user = getenv("USER");
