@@ -50,6 +50,24 @@ int parse_args(char* line, char** argv, int max_args) {
 	return argc;
 }
 
+char* read_line(char* line) {};
+
+int execute_line(char* line) {};
+
+int check_internal(char** args) {};
+
+int internal_cd(char** args) {};
+
+int internal_export(char** args) {};
+
+int internal_source(char** args) {};
+
+int internal_jobs() {};
+
+int internal_fg(char** args) {};
+
+int internal_bg(char** args) {};
+
 
 // Mètode main del programa que inclou el bucle principal temporal per a 
 // imprimir les comandes de l'usuari i sortir del programa
