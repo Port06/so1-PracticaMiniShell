@@ -50,8 +50,6 @@ int parse_args(char* line, char** argv, int max_args) {
 	return argc;
 }
 
-char* read_line(char* line) {};
-
 int execute_line(char* line) {};
 
 int check_internal(char** args) {};
