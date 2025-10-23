@@ -21,15 +21,15 @@
 // Mètode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
 	char cwd[PATH_MAX];
-	const char* user = getenv("USER");
-	if (!user) user = "user";
+	const char* user = getenv("USER"); // Es defineix el nom del 'user'
+	if (!user) user = "user"; // En cas de que l'usuari no sigui 'user'
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		strncpy(cwd, "?", sizeof(cwd));
 		cwd[sizeof(cwd) - 1] = '\0';
 	}
 
 
-	printf("%s[%s%s%s:%s%s%s]%s$ %s",
+	printf("%s[%s%s%s:%s%s%s]%s$ %s", // Imprimeix el texte amb el format adequat
 		ANSI_BOLD,
 		ANSI_GREEN, user, ANSI_RESET,
 		ANSI_BLUE, cwd, ANSI_RESET,
