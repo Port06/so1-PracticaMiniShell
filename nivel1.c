@@ -17,6 +17,9 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
+void debug(char *str) {
+	fputs(str, stderr);
+}
 
 // Mètode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
@@ -28,14 +31,34 @@ void print_prompt(void) {
 		cwd[sizeof(cwd) - 1] = '\0';
 	}
 
-
 	printf("%s[%s%s%s:%s%s%s]%s$ %s", // Imprimeix el texte amb el format adequat
 		ANSI_BOLD,
 		ANSI_GREEN, user, ANSI_RESET,
 		ANSI_BLUE, cwd, ANSI_RESET,
 		ANSI_BOLD,
 		ANSI_RESET);
+
 	fflush(stdout);
+}
+
+char *read_line(char *line) {
+	print_prompt();
+
+	char buff[LINE_MAX_LEN];
+	if (fgets(buff, sizeof(buff) / sizeof(char), stdin) == NULL) {
+		if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
+			debug("[read_line] exit\n");
+			exit(0);
+		} else {
+			return NULL;
+		}
+	}
+
+	char *newline = strchr(buff, '\n');
+	if (newline != NULL) // Eliminam la newline final, si n'hi ha
+		*newline = '\0';
+
+	return buff; // TODO!!!!!!!!
 }
 
 int parse_line(char* line, char** argv, int max_args) {
