@@ -50,6 +50,50 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
+int execute_line(char* line) {};
+
+int check_internal(char** args) {
+	if (args == NULL || args[0] == NULL) return 0;
+
+
+	if (strcmp(args[0], "exit") == 0) { // Comanda per a sortir del programa
+		printf("Bye Bye\n");
+		exit(EXIT_SUCCESS);
+	}
+	// Altres comandes sense funcionalitat temporalment
+	else if (strcmp(args[0], "cd") == 0) {
+		return internal_cd(args);
+	}
+	else if (strcmp(args[0], "export") == 0) {
+		return internal_export(args);
+	}
+	else if (strcmp(args[0], "source") == 0) {
+		return internal_source(args);
+	}
+	else if (strcmp(args[0], "jobs") == 0) {
+		return internal_jobs(args);
+	}
+	else if (strcmp(args[0], "fg") == 0) {
+		return internal_fg(args);
+	}
+	else if (strcmp(args[0], "bg") == 0) {
+		return internal_bg(args);
+	}
+	return 0;
+}
+
+int internal_cd(char** args) {};
+
+int internal_export(char** args) {};
+
+int internal_source(char** args) {};
+
+int internal_jobs() {};
+
+int internal_fg(char** args) {};
+
+int internal_bg(char** args) {};
+
 
 // Mètode main del programa que inclou el bucle principal temporal per a 
 // imprimir les comandes de l'usuari i sortir del programa
