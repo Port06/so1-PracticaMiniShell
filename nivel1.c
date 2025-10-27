@@ -6,6 +6,8 @@
 #include <sys/wait.h>
 #include <limits.h>
 
+#include <stdarg.h>
+
 // Es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
 #define MAX_ARGS 64
@@ -17,8 +19,12 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
-void debug(char *str) {
-	fputs(str, stderr);
+void debug(char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
 }
 
 // Mètode que imprimeix per pantalla la comanda de l'usuari
@@ -74,11 +80,18 @@ int parse_line(char* line, char** argv, int max_args) {
 	char* token = strtok(line, delim);
 
 	while (token != NULL && argc < max_args - 1) {
+		if (*token == '#') // Si comenca per #, hem d'ignorar el token
+			token = NULL;
+
 		argv[argc++] = token;
 		token = strtok(NULL, delim);
 	}
 
 	argv[argc] = NULL;
+
+	for (int i = 0; i <= argc; i++)
+		debug("[parse_line] token %i: %s\n", i, argv[i]);
+
 	return argc;
 }
 
