@@ -96,7 +96,21 @@ int parse_line(char* line, char** argv, int max_args) {
 }
 
 int internal_cd(char** args) {
-	debug("[internal_cd] not implemented\n");
+	char *path;
+
+	if (args[1] == NULL)
+		path = getenv("HOME");
+	else
+		path = args[1];
+
+	chdir(path);
+
+	char cwd[LINE_MAX_LEN];
+	if (getcwd(cwd, sizeof(cwd) / sizeof(char)) != NULL)
+		debug("[internal_cd] getcwd is %s\n", cwd);
+	else
+		debug("[internal_cd] error while getcwd()\n");
+
 	return 0;
 }
 
