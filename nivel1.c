@@ -44,13 +44,18 @@ void print_prompt(void) {
 	fflush(stdout);
 }
 
+void internal_exit() {
+	debug("exit\n");
+	exit(EXIT_SUCCESS);
+}
+
 char *read_line(char *line, size_t len) {
 	print_prompt();
 
 	if (fgets(line, len, stdin) == NULL) {
 		if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
-			debug("[read_line] exit\n");
-			exit(EXIT_SUCCESS);
+			debug("\n[read_line] ");
+			internal_exit();
 		} else {
 			return NULL;
 		}
@@ -77,25 +82,43 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
-int internal_cd(char** args) {};
+int internal_cd(char** args) {
+	debug("[internal_cd] not implemented\n");
+	return 0;
+}
 
-int internal_export(char** args) {};
+int internal_export(char** args) {
+	debug("[internal_export] not implemented\n");
+	return 0;
+};
 
-int internal_source(char** args) {};
+int internal_source(char** args) {
+	debug("[internal_source] not implemented\n");
+	return 0;
+};
 
-int internal_jobs() {};
+int internal_jobs() {
+	debug("[internal_jobs] not implemented\n");
+	return 0;
+};
 
-int internal_fg(char** args) {};
+int internal_fg(char** args) {
+	debug("[internal_fg] not implemented\n");
+	return 0;
+};
 
-int internal_bg(char** args) {};
+int internal_bg(char** args) {
+	debug("[internal_bg] not implemented\n");
+	return 0;
+};
 
 int check_internal(char** args) {
 	if (args == NULL || args[0] == NULL)
 		return 0;
 
 	if (strcmp(args[0], "exit") == 0) { // Comanda per a sortir del programa
-		printf("Bye Bye\n");
-		exit(EXIT_SUCCESS);
+		debug("[internal] ");
+		internal_exit();
 	}
 
 	// Altres comandes sense funcionalitat temporalment
