@@ -19,6 +19,8 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
+int debugN1 = 1;
+
 void debug(char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
