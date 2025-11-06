@@ -14,7 +14,7 @@
 
 // Codis ansi per al estil i color del texte
 #define ANSI_BOLD "\x1b[1m" // Texte en negreta
-#define ANSI_RESET "\x1b[0m" // Reinicialització del format
+#define ANSI_RESET "\x1b[0m" // Reinicialitzaciï¿½ del format
 #define ANSI_BLUE "\x1b[34m" // Blau
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
@@ -29,7 +29,7 @@ void debug(char *fmt, ...) {
 	va_end(ap);
 }
 
-// Mètode que imprimeix per pantalla la comanda de l'usuari
+// Mï¿½tode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
 	char cwd[LINE_MAX_LEN];
 	const char* user = getenv("USER"); // Es defineix el nom del 'user'
@@ -115,29 +115,28 @@ int internal_cd(char** args) {
 
 	return 0;
 }
-
 int internal_export(char** args) {
-	debug("[internal_export] not implemented\n");
+	debug("[internal_export] This function will set environment variables in later phases.\n");
 	return 0;
 };
 
 int internal_source(char** args) {
-	debug("[internal_source] not implemented\n");
+	debug("[internal_source] This function will read and execute commands from a file in later phases.\n");
 	return 0;
 };
 
 int internal_jobs() {
-	debug("[internal_jobs] not implemented\n");
+	debug("[internal_jobs] This function will list background jobs in later phases.\n");
 	return 0;
 };
 
 int internal_fg(char** args) {
-	debug("[internal_fg] not implemented\n");
+	debug("[internal_fg] This function will bring a background job to the foreground in later phases.\n");
 	return 0;
 };
 
 int internal_bg(char** args) {
-	debug("[internal_bg] not implemented\n");
+	debug("[internal_bg] This function will resume a suspended job in the background in later phases.\n");
 	return 0;
 };
 
