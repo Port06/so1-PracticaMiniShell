@@ -8,16 +8,16 @@
 #include <stdarg.h>
 #include <errno.h>
 
-// Es defineix el tamany i els arguments limit d'una comanda
+// es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
 #define MAX_ARGS 64
 
-// Codis ansi per al estil i color del texte
-#define ANSI_BOLD "\x1b[1m" // Texte en negreta
-#define ANSI_RESET "\x1b[0m" // Reinicialitzaci� del format
-#define ANSI_BLUE "\x1b[34m" // Blau
-#define ANSI_GREEN "\x1b[32m" // Verd
-#define ANSI_YELLOW "\x1b[33m" // Groc
+// codis ansi per al estil i color del texte
+#define ANSI_BOLD "\x1b[1m" // texte en negreta
+#define ANSI_RESET "\x1b[0m" // reinicialitzaci� del format
+#define ANSI_BLUE "\x1b[34m" // blau
+#define ANSI_GREEN "\x1b[32m" // verd
+#define ANSI_YELLOW "\x1b[33m" // groc
 
 int debugN1 = 0;
 int debugN2 = 1;
@@ -29,7 +29,7 @@ void debug(const char* fmt, ...) {
     va_end(ap);
 }
 
-//pequeño strndup local por si no existe en el entorno
+// petit strndup local per si no existeix en el entorn
 static char* strndup_local(const char* s, size_t n) {
     size_t len = strnlen(s, n);
     char* p = malloc(len + 1);
@@ -48,7 +48,7 @@ int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
 
-// M�tode que imprimeix per pantalla la comanda de l'usuari
+// metode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
     char cwd[LINE_MAX_LEN];
     const char* user = getenv("USER");
@@ -78,7 +78,7 @@ char* read_line(char* line, size_t len) {
     print_prompt();
 
     if (fgets(line, len, stdin) == NULL) {
-        if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
+        if (feof(stdin)) { // usuari ha pitjat Ctrl+D
             debug("\n[read_line] EOF\n");
             internal_exit();
         }
@@ -88,11 +88,11 @@ char* read_line(char* line, size_t len) {
     }
 
     char* newline = strchr(line, '\n');
-    if (newline != NULL) *newline = '\0'; // Eliminam la newline final, si n'hi ha
+    if (newline != NULL) *newline = '\0'; // eliminar la newline final, si n'hi ha
     return line;
 }
 
-// parse_line: tokeniza y corta en '#' (comentarios). No mete NULL como token
+// parse_line: tokenitza i talla en '#' (comentaris). No afageix NULL com a token
 int parse_line(char* line, char** argv, int max_args) {
     int argc = 0;
     const char* delim = " \t\n";
@@ -100,7 +100,7 @@ int parse_line(char* line, char** argv, int max_args) {
 
     while (token != NULL && argc < max_args - 1) {
         if (token[0] == '#') { // Si comenca per #, hem d'ignorar el token
-            break; // Ignorar el que queda de la linia
+            break; // ignorar el que queda de la linia
         }
         argv[argc++] = token;
         token = strtok(NULL, delim);
@@ -146,7 +146,7 @@ int internal_cd(char** args) {
                 if (buf[0] != '\0') strcat(buf, " ");
                 strcat(buf, args[i]);
             }
-            // quitar comillas exteriores si las tiene
+            // retirar les cometes presents a les instruccions
             size_t len = strlen(buf);
             if (len >= 2 && ((buf[0] == '\'' && buf[len - 1] == '\'') || (buf[0] == '"' && buf[len - 1] == '"'))) {
                 buf[len - 1] = '\0';
@@ -158,7 +158,7 @@ int internal_cd(char** args) {
             }
             else {
                 target = buf;
-                target_malloced = 1; // hay que liberar al final
+                target_malloced = 1; // es llibera el final
             }
         }
     }
@@ -177,10 +177,10 @@ int internal_cd(char** args) {
     else {
         // mostrar cwd (solo en este nivel de práctica) 
         printf("%s\n", cwd);
-        // actualizar PWD en entorno
+        // actualitzar PWD en entorn
         if (setenv("PWD", cwd, 1) != 0) {
             perror("");
-            // no abortamos: ya hemos cambiado de cwd 
+            // no abortam: ja que hem cambiat de cwd 
         }
     }
 
@@ -188,7 +188,7 @@ int internal_cd(char** args) {
     return 1;
 }
 
-//internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test) 
+//internal_export: parseja NOMBRE=VALOR en args[1], mostra mostra abans i despres
 int internal_export(char** args) {
     if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "export: sintaxis correcta: export NOMBRE=VALOR\n");
@@ -235,7 +235,7 @@ int internal_export(char** args) {
     return 1;
 }
 
-/* stubs coherentes */
+// stubs coherents
 int internal_source(char** args) { (void)args; debug("[internal_source] not implemented\n"); return 1; }
 int internal_jobs(char** args) { (void)args; debug("[internal_jobs] not implemented\n");   return 1; }
 int internal_fg(char** args) { (void)args; debug("[internal_fg] not implemented\n");     return 1; }
@@ -269,7 +269,7 @@ int check_internal(char** args) {
     return 0;
 }
 
-/* Ejecuta la linea: si interno -> ya manejado, si no -> fork + execvp */
+// executa la linea: si es intern -> ja manetjat, si no -> fork + execvp */
 int execute_line(char* line) {
     char* argv[MAX_ARGS];
     int argc = parse_line(line, argv, MAX_ARGS);
