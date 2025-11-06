@@ -1,5 +1,4 @@
-﻿/* nivel2.c - minishell (cd y export implementados, versión corregida) */
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
