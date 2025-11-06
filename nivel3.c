@@ -248,10 +248,25 @@ int internal_export(char** args) {
 }
 
 /* stubs coherentes */
-int internal_source(char** args) { (void)args; debug("[internal_source] not implemented\n"); return 1; }
-int internal_jobs(char** args) { (void)args; debug("[internal_jobs] not implemented\n");   return 1; }
-int internal_fg(char** args) { (void)args; debug("[internal_fg] not implemented\n");     return 1; }
-int internal_bg(char** args) { (void)args; debug("[internal_bg] not implemented\n");     return 1; }
+int internal_source(char** args) {
+	debug("[internal_source] This function will read and execute commands from a file in later phases.\n");
+	return 0;
+};
+
+int internal_jobs() {
+	debug("[internal_jobs] This function will list background jobs in later phases.\n");
+	return 0;
+};
+
+int internal_fg(char** args) {
+	debug("[internal_fg] This function will bring a background job to the foreground in later phases.\n");
+	return 0;
+};
+
+int internal_bg(char** args) {
+	debug("[internal_bg] This function will resume a suspended job in the background in later phases.\n");
+	return 0;
+};
 
 int check_internal(char** args) {
     if (args == NULL || args[0] == NULL) return 0;

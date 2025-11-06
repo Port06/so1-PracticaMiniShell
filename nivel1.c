@@ -115,6 +115,7 @@ int internal_cd(char** args) {
 
 	return 0;
 }
+
 int internal_export(char** args) {
 	debug("[internal_export] This function will set environment variables in later phases.\n");
 	return 0;
