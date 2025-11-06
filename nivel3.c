@@ -137,43 +137,44 @@ int internal_cd(char** args) {
             fprintf(stderr, "cd: HOME no definido\n");
             return 1;
         }
+
+		return 0;
     }
-    else {
-        if (args[2] == NULL) {
-            target = args[1];
-        }
-        else {
-            size_t bufsize = LINE_MAX_LEN;
-            char* buf = malloc(bufsize);
-            if (!buf) { perror(""); return 1; }
-            buf[0] = '\0';
-            for (int i = 1; args[i] != NULL; ++i) {
-                size_t need = strlen(buf) + strlen(args[i]) + 2;
-                if (need > bufsize) {
-                    bufsize = need * 2;
-                    char* tmp = realloc(buf, bufsize);
-                    if (!tmp) { free(buf); perror(""); return 1; }
-                    buf = tmp;
-                }
-                if (buf[0] != '\0') strcat(buf, " ");
-                strcat(buf, args[i]);
-            }
-            // quitar comillas exteriores si las tiene
-            size_t len = strlen(buf);
-            if (len >= 2 && ((buf[0] == '\'' && buf[len - 1] == '\'') || (buf[0] == '"' && buf[len - 1] == '"'))) {
-                buf[len - 1] = ' ';
-                char* copy = strndup_local(buf + 1, strlen(buf + 1));
-                free(buf);
-                if (!copy) { perror(""); return 1; }
-                target = copy;
-                target_malloced = 1;
-            }
-            else {
-                target = buf;
-                target_malloced = 1; // hay que liberar al final
-            }
-        }
-    }
+
+	if (args[2] == NULL) {
+		target = args[1];
+	}
+	else {
+		size_t bufsize = LINE_MAX_LEN;
+		char* buf = malloc(bufsize);
+		if (!buf) { perror(""); return 1; }
+		buf[0] = '\0';
+		for (int i = 1; args[i] != NULL; ++i) {
+			size_t need = strlen(buf) + strlen(args[i]) + 2;
+			if (need > bufsize) {
+				bufsize = need * 2;
+				char* tmp = realloc(buf, bufsize);
+				if (!tmp) { free(buf); perror(""); return 1; }
+				buf = tmp;
+			}
+			if (buf[0] != '\0') strcat(buf, " ");
+			strcat(buf, args[i]);
+		}
+		// quitar comillas exteriores si las tiene
+		size_t len = strlen(buf);
+		if (len >= 2 && ((buf[0] == '\'' && buf[len - 1] == '\'') || (buf[0] == '"' && buf[len - 1] == '"'))) {
+			buf[len - 1] = ' ';
+			char* copy = strndup_local(buf + 1, strlen(buf + 1));
+			free(buf);
+			if (!copy) { perror(""); return 1; }
+			target = copy;
+			target_malloced = 1;
+		}
+		else {
+			target = buf;
+			target_malloced = 1; // hay que liberar al final
+		}
+	}
 
     if (chdir(target) != 0) {
         perror("");
@@ -315,10 +316,16 @@ int execute_line(char* line) {
     }
 
     if (pid == 0) {
+		debug("[execute_line] fork: parent pid is %d\n", getpid());
+		debug("[execute_line] shell is \"%s\"\n", my_shell);
+		debug("[execute_line] child cmd is \"%s\"\n", cmd);
+
         execvp(argv[0], argv);
         perror("");
         exit(EXIT_FAILURE);
-    } else {
+    } else if (pid > 0) {
+		debug("[execute_line] fork: child pid is %d\n", pid);
+
 		jobs_list[0].pid = pid;
 		jobs_list[0].status = 'E';
 		strncpy(jobs_list[0].cmd, cmd, LINE_MAX_LEN);
@@ -326,7 +333,12 @@ int execute_line(char* line) {
         int status;
         if (waitpid(pid, &status, 0) < 0)
 			perror("waitpid");
-    }
+
+		if (WIFEXITED(status))
+			debug("[execute_line] child exited with status %d\n", WEXITSTATUS(status));
+    } else {
+		perror("fork");
+	}
 
     return 1;
 }
