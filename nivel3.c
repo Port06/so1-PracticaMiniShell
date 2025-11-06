@@ -160,7 +160,7 @@ int internal_cd(char** args) {
             // quitar comillas exteriores si las tiene
             size_t len = strlen(buf);
             if (len >= 2 && ((buf[0] == '\'' && buf[len - 1] == '\'') || (buf[0] == '"' && buf[len - 1] == '"'))) {
-                buf[len - 1] = '\0';
+                buf[len - 1] = ' ';
                 char* copy = strndup_local(buf + 1, strlen(buf + 1));
                 free(buf);
                 if (!copy) { perror(""); return 1; }
