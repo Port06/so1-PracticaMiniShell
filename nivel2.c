@@ -9,14 +9,16 @@
 #include <stdarg.h>
 #include <errno.h>
 
+// Es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
 #define MAX_ARGS 64
 
-#define ANSI_BOLD "\x1b[1m"
-#define ANSI_RESET "\x1b[0m"
-#define ANSI_BLUE "\x1b[34m"
-#define ANSI_GREEN "\x1b[32m"
-#define ANSI_YELLOW "\x1b[33m"
+// Codis ansi per al estil i color del texte
+#define ANSI_BOLD "\x1b[1m" // Texte en negreta
+#define ANSI_RESET "\x1b[0m" // Reinicialitzaci� del format
+#define ANSI_BLUE "\x1b[34m" // Blau
+#define ANSI_GREEN "\x1b[32m" // Verd
+#define ANSI_YELLOW "\x1b[33m" // Groc
 
 int debugN1 = 0;
 int debugN2 = 1;
@@ -28,7 +30,7 @@ void debug(const char* fmt, ...) {
     va_end(ap);
 }
 
-/* pequeño strndup local por si no existe en el entorno */
+//pequeño strndup local por si no existe en el entorno
 static char* strndup_local(const char* s, size_t n) {
     size_t len = strnlen(s, n);
     char* p = malloc(len + 1);
@@ -38,7 +40,7 @@ static char* strndup_local(const char* s, size_t n) {
     return p;
 }
 
-/* prototipos */
+// prototipos
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
@@ -47,6 +49,7 @@ int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
 
+// M�tode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
     char cwd[LINE_MAX_LEN];
     const char* user = getenv("USER");
@@ -76,7 +79,7 @@ char* read_line(char* line, size_t len) {
     print_prompt();
 
     if (fgets(line, len, stdin) == NULL) {
-        if (feof(stdin)) {
+        if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
             debug("\n[read_line] EOF\n");
             internal_exit();
         }
@@ -86,20 +89,19 @@ char* read_line(char* line, size_t len) {
     }
 
     char* newline = strchr(line, '\n');
-    if (newline != NULL) *newline = '\0';
+    if (newline != NULL) *newline = '\0'; // Eliminam la newline final, si n'hi ha
     return line;
 }
 
-/* parse_line: tokeniza y corta en '#' (comentarios). No mete NULL como token. */
+// parse_line: tokeniza y corta en '#' (comentarios). No mete NULL como token
 int parse_line(char* line, char** argv, int max_args) {
     int argc = 0;
     const char* delim = " \t\n";
     char* token = strtok(line, delim);
 
     while (token != NULL && argc < max_args - 1) {
-        if (token[0] == '#') {
-            /* comentario: ignorar resto de la línea */
-            break;
+        if (token[0] == '#') { // Si comenca per #, hem d'ignorar el token
+            break; // Ignorar el que queda de la linia
         }
         argv[argc++] = token;
         token = strtok(NULL, delim);
@@ -112,7 +114,7 @@ int parse_line(char* line, char** argv, int max_args) {
     return argc;
 }
 
-/* internal_cd: implementa cd sin args -> HOME, un arg, o varios (concatena y quita comillas) */
+// internal_cd: implementa cd sin args -> HOME, un arg, o varios (concatena y quita comillas) 
 int internal_cd(char** args) {
     char* target = NULL;
     char cwd[LINE_MAX_LEN];
@@ -145,7 +147,7 @@ int internal_cd(char** args) {
                 if (buf[0] != '\0') strcat(buf, " ");
                 strcat(buf, args[i]);
             }
-            /* quitar comillas exteriores si las tiene */
+            // quitar comillas exteriores si las tiene
             size_t len = strlen(buf);
             if (len >= 2 && ((buf[0] == '\'' && buf[len - 1] == '\'') || (buf[0] == '"' && buf[len - 1] == '"'))) {
                 buf[len - 1] = '\0';
@@ -157,7 +159,7 @@ int internal_cd(char** args) {
             }
             else {
                 target = buf;
-                target_malloced = 1; /* hay que liberar al final */
+                target_malloced = 1; // hay que liberar al final
             }
         }
     }
@@ -174,12 +176,12 @@ int internal_cd(char** args) {
         return 1;
     }
     else {
-        /* Mostrar cwd (solo en este nivel de práctica) */
+        // mostrar cwd (solo en este nivel de práctica) 
         printf("%s\n", cwd);
-        /* actualizar PWD en entorno */
+        // actualizar PWD en entorno
         if (setenv("PWD", cwd, 1) != 0) {
             perror("");
-            /* no abortamos: ya hemos cambiado de cwd */
+            // no abortamos: ya hemos cambiado de cwd 
         }
     }
 
@@ -187,7 +189,7 @@ int internal_cd(char** args) {
     return 1;
 }
 
-/* internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test) */
+//internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test) 
 int internal_export(char** args) {
     if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "export: sintaxis correcta: export NOMBRE=VALOR\n");
