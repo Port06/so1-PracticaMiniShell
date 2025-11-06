@@ -1,4 +1,7 @@
-﻿#include <stdio.h>
+/* nivel2.c - minishell (cd y export implementados, versión corregida) */
+#define _POSIX_C_SOURCE 200809L
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -6,7 +9,6 @@
 #include <sys/wait.h>
 #include <limits.h>
 #include <stdarg.h>
-#include <errno.h>
 
 // Es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
