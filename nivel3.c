@@ -54,7 +54,7 @@ static struct info_job jobs_list[N_JOBS];
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
-int internal_jobs(char** args);
+int internal_jobs();
 int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);

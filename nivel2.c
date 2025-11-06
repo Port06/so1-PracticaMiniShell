@@ -45,7 +45,7 @@ static char* strndup_local(const char* s, size_t n) {
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
-int internal_jobs(char** args);
+int internal_jobs();
 int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
