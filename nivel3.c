@@ -44,11 +44,12 @@ static char* strndup_local(const char* s, size_t n) {
 
 struct info_job {
 	pid_t pid;
-	char state;
+	char status;
 	char cmd[LINE_MAX_LEN];
 };
 
 static struct info_job jobs_list[N_JOBS];
+static char my_shell[LINE_MAX_LEN];
 
 // prototipos
 int internal_cd(char** args);
@@ -297,39 +298,56 @@ int check_internal(char** args) {
 
 /* Ejecuta la linea: si interno -> ya manejado, si no -> fork + execvp */
 int execute_line(char* line) {
-    char* argv[MAX_ARGS];
+    char *argv[MAX_ARGS];
+	char *cmd = line;
     int argc = parse_line(line, argv, MAX_ARGS);
 
-    if (argc == 0) return 0;
+    if (argc == 0)
+		return 0;
 
-    if (check_internal(argv)) return 1;
+    if (check_internal(argv))
+		return 1;
 
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
         return -1;
     }
+
     if (pid == 0) {
         execvp(argv[0], argv);
         perror("");
-        _exit(EXIT_FAILURE);
-    }
-    else {
+        exit(EXIT_FAILURE);
+    } else {
+		jobs_list[0].pid = pid;
+		jobs_list[0].status = 'E';
+		strncpy(jobs_list[0].cmd, cmd, LINE_MAX_LEN);
+
         int status;
-        if (waitpid(pid, &status, 0) < 0) perror("waitpid");
+        if (waitpid(pid, &status, 0) < 0)
+			perror("waitpid");
     }
+
     return 1;
 }
 
-int main(void) {
+int main(int argc, char** argv) {
 	jobs_list[0].pid = 0;
-	jobs_list[0].state = 'N';
-	memset(jobs_list[0].cmd, '\0', sizeof(jobs_list[0].cmd) / sizeof(char));
+	jobs_list[0].status = 'N';
+	memset(jobs_list[0].cmd, '\0', LINE_MAX_LEN);
+
+	strncpy(my_shell, argv[0], LINE_MAX_LEN);
 
     while (1) {
         char line[LINE_MAX_LEN];
-        if (read_line(line, sizeof(line)) == NULL) continue;
+        if (read_line(line, sizeof(line)) == NULL)
+			continue;
+
         execute_line(line);
+
+		jobs_list[0].pid = 0;
+		jobs_list[0].status = 'N';
+		memset(jobs_list[0].cmd, '\0', LINE_MAX_LEN);
     }
 
     return 0;
