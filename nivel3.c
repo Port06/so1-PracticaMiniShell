@@ -1,4 +1,3 @@
-/* nivel2.c - minishell (cd y export implementados, versión corregida) */
 #define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
