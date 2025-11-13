@@ -104,19 +104,57 @@ char* read_line(char* line, size_t len) {
     return line;
 }
 
-// parse_line: tokeniza y corta en '#' (comentarios). No mete NULL como token
+// parse_line: tokenitza i talla en '#' (comentaris). No afageix NULL com a token
+// parse_line que respeta comillas simples y dobles, y corta en '#' (comentarios)
 int parse_line(char* line, char** argv, int max_args) {
     int argc = 0;
-    const char* delim = " \t\n";
-    char* token = strtok(line, delim);
+    char* p = line;
 
-    while (token != NULL && argc < max_args - 1) {
-        if (token[0] == '#') { // Si comenca per #, hem d'ignorar el token
-            break; // Ignorar el que queda de la linia
+    while (*p != '\0' && argc < max_args - 1) {
+        // saltar espacios
+        while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+        if (*p == '\0' || *p == '#') break;
+
+        if (*p == '"' || *p == '\'') {
+            char quote = *p++;
+            char* start = p;
+            // buscar cierre de comilla
+            while (*p != '\0' && *p != quote) {
+                if (*p == '\\' && *(p + 1) != '\0') p += 2; // permitir escapes simples
+                else p++;
+            }
+            if (*p == quote) {
+                *p = '\0';
+                argv[argc++] = start;
+                p++; // avanzar después de la comilla final
+            }
+            else {
+                // comilla no cerrada: tomar hasta el final
+                argv[argc++] = start;
+                break;
+            }
         }
-        argv[argc++] = token;
-        token = strtok(NULL, delim);
+        else {
+            char* start = p;
+            while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') p++;
+            if (*p == '#') {
+                // terminar token y descartar resto -> comentario
+                *p = '\0';
+                argv[argc++] = start;
+                break;
+            }
+            if (*p != '\0') {
+                *p = '\0';
+                argv[argc++] = start;
+                p++;
+            }
+            else {
+                argv[argc++] = start;
+                break;
+            }
+        }
     }
+
     argv[argc] = NULL;
 
     for (int i = 0; i <= argc; ++i)
@@ -129,75 +167,35 @@ int parse_line(char* line, char** argv, int max_args) {
 int internal_cd(char** args) {
     char* target = NULL;
     char cwd[LINE_MAX_LEN];
-    int target_malloced = 0;
 
+    // Si no hay argumento -> HOME
     if (args == NULL || args[1] == NULL) {
         target = getenv("HOME");
         if (target == NULL) {
             fprintf(stderr, "cd: HOME no definido\n");
             return 1;
         }
-
-		return 0;
-    }
-
-	if (args[2] == NULL) {
-		target = args[1];
-	}
-	else {
-		size_t bufsize = LINE_MAX_LEN;
-		char* buf = malloc(bufsize);
-		if (!buf) { perror(""); return 1; }
-		buf[0] = '\0';
-		for (int i = 1; args[i] != NULL; ++i) {
-			size_t need = strlen(buf) + strlen(args[i]) + 2;
-			if (need > bufsize) {
-				bufsize = need * 2;
-				char* tmp = realloc(buf, bufsize);
-				if (!tmp) { free(buf); perror(""); return 1; }
-				buf = tmp;
-			}
-			if (buf[0] != '\0') strcat(buf, " ");
-			strcat(buf, args[i]);
-		}
-		// quitar comillas exteriores si las tiene
-		size_t len = strlen(buf);
-		if (len >= 2 && ((buf[0] == '\'' && buf[len - 1] == '\'') || (buf[0] == '"' && buf[len - 1] == '"'))) {
-			buf[len - 1] = ' ';
-			char* copy = strndup_local(buf + 1, strlen(buf + 1));
-			free(buf);
-			if (!copy) { perror(""); return 1; }
-			target = copy;
-			target_malloced = 1;
-		}
-		else {
-			target = buf;
-			target_malloced = 1; // hay que liberar al final
-		}
-	}
-
-    if (chdir(target) != 0) {
-        perror("");
-        if (target_malloced) free(target);
-        return 1;
-    }
-
-    if (getcwd(cwd, sizeof(cwd)) == NULL) {
-        perror("");
-        if (target_malloced) free(target);
-        return 1;
     }
     else {
-        // mostrar cwd (solo en este nivel de práctica) 
-        printf("%s\n", cwd);
-        // actualizar PWD en entorno
-        if (setenv("PWD", cwd, 1) != 0) {
-            perror("");
-            // no abortamos: ya hemos cambiado de cwd 
-        }
+        target = args[1];  // El parser ya devuelve la ruta completa, sin comillas
     }
 
-    if (target_malloced) free(target);
+    if (chdir(target) != 0) {
+        perror("cd");
+        return 1;
+    }
+
+    // Actualizar PWD y mostrar cwd
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("cd");
+        return 1;
+    }
+    printf("%s\n", cwd);
+    if (setenv("PWD", cwd, 1) != 0) {
+        perror("cd");
+        // no abortamos, ya cambiamos de directorio
+    }
+
     return 1;
 }
 
