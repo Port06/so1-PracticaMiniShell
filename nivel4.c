@@ -191,7 +191,8 @@ int internal_cd(char** args) {
         perror("cd");
         return 1;
     }
-    printf("%s\n", cwd);
+
+    debug("[internal_cd] %s\n", cwd);
     if (setenv("PWD", cwd, 1) != 0) {
         perror("cd");
         // no abortamos, ya cambiamos de directorio
@@ -216,17 +217,23 @@ int internal_export(char** args) {
 
     size_t name_len = eq - pair;
     char* name = strndup_local(pair, name_len);
-    if (!name) { perror(""); return 1; }
+    if (!name) {
+		perror("");
+		return 1;
+	}
+
     char* value = strdup(eq + 1);
-    if (!value) { free(name); perror(""); return 1; }
+    if (!value) {
+		free(name);
+		perror("");
+		return 1;
+	}
 
     char* before = getenv(name);
-    if (before != NULL) {
-        printf("%s=%s\n", name, before);
-    }
-    else {
-        printf("%s no estaba definida\n", name);
-    }
+    if (before != NULL)
+        debug("[internal_export] %s=%s\n", name, before);
+    else
+        debug("[internal_export] %s was previously undefined\n", name);
 
     if (setenv(name, value, 1) != 0) {
         perror("");
@@ -235,12 +242,10 @@ int internal_export(char** args) {
     }
 
     char* after = getenv(name);
-    if (after != NULL) {
-        printf("%s=%s\n", name, after);
-    }
-    else {
+    if (after != NULL)
+        debug("[internal_export] %s=%s\n", name, after);
+    else
         fprintf(stderr, "export: error inesperado al leer %s\n", name);
-    }
 
     free(name);
     free(value);
@@ -278,20 +283,18 @@ void reaper(int signum) {
     while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
         if (WIFEXITED(status)) {
             int exitcode = WEXITSTATUS(status);
-            fprintf(stderr, "[reaper()→ Proceso hijo %d (%s) finalizado con exit code %d]\n",
+            debug("[reaper] child process %d (%s) finished with exit code %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 exitcode);
-        }
-        else if (WIFSIGNALED(status)) {
+        } else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
-            fprintf(stderr, "[reaper()→ Proceso hijo %d (%s) finalizado por señal %d]\n",
+            debug("[reaper] child process %d (%s) terminated by signal %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 sig);
-        }
-        else {
-            fprintf(stderr, "[reaper()→ Proceso hijo %d finalizado (status %d)]\n", ended, status);
+        } else {
+            debug("[reaper] child process %d finished (status %d)\n", ended, status);
         }
 
         if (jobs_list[0].pid == ended) {
@@ -310,7 +313,7 @@ void ctrlc(int signum) {
     pid_t fg = jobs_list[0].pid;
     pid_t me = getpid();
 
-    fprintf(stderr, "[ctrlc()→ Soy el proceso con PID %d (%s), el proceso en foreground es %d (%s)]\n",
+    debug("[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
         me,
         my_shell,
         fg,
@@ -320,22 +323,21 @@ void ctrlc(int signum) {
         if (fg != me) {
             // enviar SIGTERM al proceso foreground (no al shell)
             if (kill(fg, SIGTERM) == 0) {
-                fprintf(stderr, "[ctrlc()→ Señal 15 enviada a %d (%s) por %d (%s)]\n",
+                debug("[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n",
                     fg, jobs_list[0].cmd, me, my_shell);
             }
             else {
-                perror("[ctrlc] kill");
+                perror("kill");
             }
         }
         else {
-            fprintf(stderr, "[ctrlc()→ Señal 15 no enviada por %d (%s) debido a que su proceso en foreground es el shell]\n",
-                me, my_shell);
+            debug("[ctrlc] signal 15 not sent by %d (%s): foreground process is the shell\n", me, my_shell);
         }
     }
     else {
-        fprintf(stderr, "[ctrlc()→ Señal 15 no enviada por %d (%s) debido a que no hay proceso en foreground]\n",
-            me, my_shell);
+        debug("[ctrlc] signal 15 not sent by %d (%s): no foreground process\n", me, my_shell);
     }
+
     fflush(stdout);
 }
 
@@ -398,7 +400,7 @@ int execute_line(char* line) {
     }
     else if (pid > 0) {
         // PARE
-        debug("[execute_line] fork: child pid is %d\n", pid);
+        debug("[execute_line] fork: child PID is %d\n", pid);
 
         jobs_list[0].pid = pid;
         jobs_list[0].status = 'E';
@@ -406,8 +408,8 @@ int execute_line(char* line) {
         jobs_list[0].cmd[LINE_MAX_LEN - 1] = '\0';
 
   
-        debug("[execute_line()→ PID padre: %d (%s)]\n", getpid(), my_shell);
-        debug("[execute_line()→ PID hijo: %d (%s)]\n", pid, cmd);
+        debug("[execute_line] parent PID: %d (%s)]\n", getpid(), my_shell);
+        debug("[execute_line] child PID: %d (%s)]\n", pid, cmd);
 
  
         while (jobs_list[0].pid != 0) {
