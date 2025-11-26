@@ -284,9 +284,17 @@ int internal_source(char** args) {
 	return 0;
 };
 
+// Recorrera jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat)
+// Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash
 int internal_jobs() {
-	debug("[internal_jobs] This function will list background jobs in later phases.\n");
-	return 0;
+    for (int i = 1; i <= n_jobs; i++) {
+        printf("[%d] %d\t%c\t%s\n",
+            i,
+            jobs_list[i].pid,
+            jobs_list[i].status,
+            jobs_list[i].cmd);
+    }
+    return 0;
 };
 
 int internal_fg(char** args) {
