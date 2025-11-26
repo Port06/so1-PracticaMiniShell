@@ -62,6 +62,8 @@ int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
 
+// jobs_list_add: intenta afegir un job al final de la llista de jobs
+// retorna 0 si s'ha pogut afegir, o -1 en cas d'error (llista plena)
 int jobs_list_add(pid_t pid, char status, char *cmd) {
 	n_jobs++;
 
@@ -75,6 +77,28 @@ int jobs_list_add(pid_t pid, char status, char *cmd) {
 	} else {
 		return -1;
 	}
+}
+
+// jobs_list_find: cerca un proces amb PID determinat dins la llista de jobs
+// retorna la posicio del process, o -1 si no s'ha trobat
+int jobs_list_find(pid_t pid) {
+	for (int i = 0; i < n_jobs; i++) {
+		if (jobs_list[i].pid == pid)
+			return i;
+	}
+
+	return -1;
+}
+
+// jobs_list_remove: elimina un job de la llista de jobs
+// retorna 0 si s'ha pogut eliminar, o -1 en cas d'error (posicio invalida)
+int jobs_list_remove(int pos) {
+	if (pos >= n_jobs || pos < 0)
+		return -1;
+
+	// decrementam primer n_jobs i despres intercanviam el darrer job amb el job situat a pos
+	jobs_list[pos] = jobs_list[--n_jobs];
+	return 0;
 }
 
 // M�tode que imprimeix per pantalla la comanda de l'usuari
