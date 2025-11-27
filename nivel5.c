@@ -332,29 +332,37 @@ int internal_bg(char** args) {
 };
 
 void reaper(int signum) {
-    (void)signum;          
-    signal(SIGCHLD, reaper);    
+    (void)signum;  // Evita el warning de parámetro no usado (la señal recibida)        
+    signal(SIGCHLD, reaper);  // Reasociamos el manejador a la señal SIGCHLD  
 
     pid_t ended;
     int status;
 
+    // Recolectamos TODOS los hijos que hayan terminado sin bloquear
     while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+
+        // Caso 1: el proceso terminó de forma normal (exit)
         if (WIFEXITED(status)) {
             int exitcode = WEXITSTATUS(status);
             debug("[reaper] child process %d (%s) finished with exit code %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 exitcode);
+
+            // Caso 2: el proceso terminó por una señal
         } else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
             debug("[reaper] child process %d (%s) terminated by signal %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 sig);
+
+            // Caso 3: otro tipo de terminación (poco habitual)
         } else {
             debug("[reaper] child process %d finished (status %d)\n", ended, status);
         }
 
+        // Si el hijo que ha terminado era el proceso en foreground
         if (jobs_list[0].pid == ended) {
             jobs_list[0].pid = 0;
             jobs_list[0].status = 'F';
