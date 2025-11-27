@@ -345,6 +345,7 @@ void reaper(int signum) {
 
     // Recolectamos TODOS los hijos que hayan terminado sin bloquear
     while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+		int pos = jobs_list_find(ended);
 
         // Caso 1: el proceso terminó de forma normal (exit)
         if (WIFEXITED(status)) {
@@ -354,7 +355,7 @@ void reaper(int signum) {
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 exitcode);
 
-            // Caso 2: el proceso terminó por una señal
+		// Caso 2: el proceso terminó por una señal
         } else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
             debug("[reaper] child process %d (%s) terminated by signal %d\n",
@@ -362,18 +363,22 @@ void reaper(int signum) {
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 sig);
 
-            // Caso 3: otro tipo de terminación (poco habitual)
+		// Caso 3: otro tipo de terminación (poco habitual)
         } else {
             debug("[reaper] child process %d finished (status %d)\n", ended, status);
         }
 
-        // Si el hijo que ha terminado era el proceso en foreground
-        if (jobs_list[0].pid == ended) {
+		// Si s'executava en foreground (posicio 0), posam el job a 0
+        if (pos == 0) {
             jobs_list[0].pid = 0;
             jobs_list[0].status = 'F';
             jobs_list[0].cmd[0] = '\0';
-        }
-        
+        } else {
+			// TODO: aqui que hem d'imprimir exactament?
+			printf("child process %d (%s) ended\n", jobs_list[pos].pid, jobs_list[pos].cmd); // NO ha de ser debug, s'ha d'imprimir sempre
+		
+			jobs_list_remove(pos);
+		} 
     }
 }
 
@@ -393,23 +398,35 @@ void ctrlc(int signum) {
     if (fg > 0) {
         if (fg != me) {
             // enviar SIGTERM al proceso foreground (no al shell)
-            if (kill(fg, SIGTERM) == 0) {
-                debug("[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n",
-                    fg, jobs_list[0].cmd, me, my_shell);
-            }
-            else {
+            if (kill(fg, SIGTERM) == 0)
+                debug("[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n", fg, jobs_list[0].cmd, me, my_shell);
+            else
                 perror("kill");
-            }
-        }
-        else {
+        } else {
             debug("[ctrlc] signal 15 not sent by %d (%s): foreground process is the shell\n", me, my_shell);
         }
-    }
-    else {
+    } else {
         debug("[ctrlc] signal 15 not sent by %d (%s): no foreground process\n", me, my_shell);
     }
+}
 
-    fflush(stdout);
+void ctrlz(int signum) {
+	pid_t me = getpid();
+
+	if (n_jobs > 0) { // Hi ha processos en foreground
+		pid_t fg = jobs_list[0].pid;
+
+		if (fg != me) {
+			if (kill(fg, SIGTSTP) == 0)
+				debug("[ctrlz] signal SIGTSTP sent to %d by %d (%s)\n", fg, me, my_shell);
+			else
+				perror("kill");
+		} else {
+			debug("[ctrlz] signal SIGTSTP not sent by %d (%s): foreground process is the shell\n", me, my_shell);
+		}
+	} else {
+		debug("[ctrlz] signal SIGTSTP not sent by %d (%s): no foreground process\n", me, my_shell);
+	}
 }
 
 int check_internal(char** args) {
