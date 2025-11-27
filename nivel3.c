@@ -201,11 +201,13 @@ int internal_cd(char** args) {
 
 //internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test) 
 int internal_export(char** args) {
+    // Comprueba que se haya pasado un argumento (NOMBRE=VALOR)
     if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "export: sintaxis correcta: export NOMBRE=VALOR\n");
         return 1;
     }
 
+    // Separa el nombre y el valor buscando '='
     char* pair = args[1];
     char* eq = strchr(pair, '=');
     if (eq == NULL || eq == pair) {
@@ -213,6 +215,7 @@ int internal_export(char** args) {
         return 1;
     }
 
+    // Extrae el nombre de la variable
     size_t name_len = eq - pair;
     char* name = strndup_local(pair, name_len);
     if (!name) { perror(""); return 1; }
@@ -227,6 +230,7 @@ int internal_export(char** args) {
         printf("%s no estaba definida\n", name);
     }
 
+    // Define (o sobrescribe) la variable de entorno
     if (setenv(name, value, 1) != 0) {
         perror("");
         free(name); free(value);
@@ -241,6 +245,7 @@ int internal_export(char** args) {
         fprintf(stderr, "export: error inesperado al leer %s\n", name);
     }
 
+    // Libera la memoria reservada
     free(name);
     free(value);
     return 1;

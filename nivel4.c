@@ -203,11 +203,13 @@ int internal_cd(char** args) {
 
 //internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test) 
 int internal_export(char** args) {
+    // Comprueba que se haya pasado un argumento (NOMBRE=VALOR)
     if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "export: sintaxis correcta: export NOMBRE=VALOR\n");
         return 1;
     }
 
+    // Separa el nombre y el valor buscando '='
     char* pair = args[1];
     char* eq = strchr(pair, '=');
     if (eq == NULL || eq == pair) {
@@ -215,6 +217,7 @@ int internal_export(char** args) {
         return 1;
     }
 
+    // Extrae el nombre de la variable
     size_t name_len = eq - pair;
     char* name = strndup_local(pair, name_len);
     if (!name) {
@@ -235,6 +238,7 @@ int internal_export(char** args) {
     else
         debug("[internal_export] %s was previously undefined\n", name);
 
+    // Define (o sobrescribe) la variable de entorno
     if (setenv(name, value, 1) != 0) {
         perror("");
         free(name); free(value);
@@ -247,6 +251,7 @@ int internal_export(char** args) {
     else
         fprintf(stderr, "export: error inesperado al leer %s\n", name);
 
+    // Libera la memoria reservada
     free(name);
     free(value);
     return 1;
@@ -274,29 +279,37 @@ int internal_bg(char** args) {
 };
 
 void reaper(int signum) {
-    (void)signum;          
-    signal(SIGCHLD, reaper);    
+    (void)signum;  // Evita el warning de parámetro no usado (la señal recibida)        
+    signal(SIGCHLD, reaper);  // Reasociamos el manejador a la señal SIGCHLD  
 
     pid_t ended;
     int status;
 
+    // Recolectamos TODOS los hijos que hayan terminado sin bloquear
     while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+
+        // Caso 1: el proceso terminó de forma normal (exit)
         if (WIFEXITED(status)) {
             int exitcode = WEXITSTATUS(status);
             debug("[reaper] child process %d (%s) finished with exit code %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 exitcode);
+
+            // Caso 2: el proceso terminó por una señal
         } else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
             debug("[reaper] child process %d (%s) terminated by signal %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 sig);
+
+            // Caso 3: otro tipo de terminación (poco habitual)
         } else {
             debug("[reaper] child process %d finished (status %d)\n", ended, status);
         }
 
+        // Si el hijo que ha terminado era el proceso en foreground
         if (jobs_list[0].pid == ended) {
             jobs_list[0].pid = 0;
             jobs_list[0].status = 'F';
