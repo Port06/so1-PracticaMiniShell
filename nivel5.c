@@ -49,7 +49,7 @@ struct info_job {
 	char cmd[LINE_MAX_LEN];
 };
 
-static int n_jobs = 0;
+static int n_jobs = 1; // TODO: hauria de ser 0 o 1??
 static struct info_job jobs_list[N_JOBS];
 static char my_shell[LINE_MAX_LEN];
 
@@ -386,7 +386,7 @@ void ctrlc(int signum) {
     (void)signum;
     signal(SIGINT, ctrlc); // re-armar el manejador
 
-    pid_t fg = jobs_list[0].pid;
+    pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
     pid_t me = getpid();
 
     debug("[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
@@ -411,16 +411,25 @@ void ctrlc(int signum) {
 }
 
 void ctrlz(int signum) {
+	signal(SIGTSTP, ctrlz); // re-armar el manejador
+
+	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
 
-	if (n_jobs > 0) { // Hi ha processos en foreground
-		pid_t fg = jobs_list[0].pid;
-
+	if (fg > 0) { // Hi ha processos en foreground
 		if (fg != me) {
-			if (kill(fg, SIGTSTP) == 0)
+			if (kill(fg, SIGTSTP) == 0) {
 				debug("[ctrlz] signal SIGTSTP sent to %d by %d (%s)\n", fg, me, my_shell);
-			else
+
+				// Movem el process de foreground al background
+				jobs_list_add(fg, jobs_list[0].status, jobs_list[0].cmd);
+
+				// Resetejam el job numero 0 (foreground), perque execute_line finalitzi
+				// l'execucio i tornem al bucle del main
+				jobs_list[0] = (struct info_job) {0};
+			} else {
 				perror("kill");
+			}
 		} else {
 			debug("[ctrlz] signal SIGTSTP not sent by %d (%s): foreground process is the shell\n", me, my_shell);
 		}
