@@ -65,14 +65,14 @@ int check_internal(char** args);
 // jobs_list_add: intenta afegir un job al final de la llista de jobs
 // retorna 0 si s'ha pogut afegir, o -1 en cas d'error (llista plena)
 int jobs_list_add(pid_t pid, char status, char *cmd) {
-	n_jobs++;
-
 	if (n_jobs < N_JOBS) {
 		jobs_list[n_jobs].pid = pid;
 		jobs_list[n_jobs].status = status;
 
 		strncpy(jobs_list[n_jobs].cmd, cmd, LINE_MAX_LEN - 1);
 		jobs_list[n_jobs].cmd[LINE_MAX_LEN - 1] = '\0';
+
+		n_jobs++;
 		return 0;
 	} else {
 		return -1;
@@ -122,8 +122,7 @@ void print_prompt(void) {
 }
 
 void internal_exit() {
-	debug("exit\n");
-	printf("Bye Bye\n");
+	debug("[internal_exit] bye bye\n");
 	exit(EXIT_SUCCESS);
 }
 
@@ -316,14 +315,17 @@ int internal_source(char** args) {
 // Recorrera jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat)
 // Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash
 int internal_jobs(char** args) {
-	for (int i = 1; i <= n_jobs; i++) {
+	debug("[internal_jobs] n_jobs = %d\n", n_jobs);
+
+	for (int i = 1; i < n_jobs; i++) {
 		printf("[%d] %d\t%c\t%s\n",
 			i,
 			jobs_list[i].pid,
 			jobs_list[i].status,
 			jobs_list[i].cmd);
 	}
-	return 0;
+
+	return 1;
 };
 
 int internal_fg(char** args) {
@@ -439,10 +441,10 @@ void ctrlz(int signum) {
 }
 
 int check_internal(char** args) {
-	if (args == NULL || args[0] == NULL) return 0;
+	if (args == NULL || args[0] == NULL)
+		return 0;
 
 	if (strcmp(args[0], "exit") == 0) {
-		debug("[internal] exit\n");
 		internal_exit();
 	}
 	else if (strcmp(args[0], "cd") == 0) {
@@ -463,6 +465,7 @@ int check_internal(char** args) {
 	else if (strcmp(args[0], "bg") == 0) {
 		return internal_bg(args);
 	}
+
 	return 0;
 }
 
