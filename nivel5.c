@@ -61,6 +61,7 @@ int internal_jobs(char** args);
 int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
+int execute_line(char* line);
 
 // jobs_list_add: intenta afegir un job al final de la llista de jobs
 // retorna 0 si s'ha pogut afegir, o -1 en cas d'error (llista plena)
@@ -306,11 +307,37 @@ int internal_export(char** args) {
 	return 1;
 }
 
-/* stubs coherentes */
+// internal_source: llegeix linia per linia un fitxer, i executa cada linia
 int internal_source(char** args) {
-	debug("[internal_source] This function will read and execute commands from a file in later phases.\n");
-	return 0;
-};
+	if (args == NULL || args[1] == NULL) {
+        fprintf(stderr, "source: expected file argument\n");
+        return 1;
+	}
+
+	debug("[internal_source] reading from file %s\n", args[1]);
+
+	FILE* file = fopen(args[1], "r");
+	if (file == NULL) {
+		perror("fopen");
+		return 1;
+	}
+
+	char line[LINE_MAX_LEN];
+
+	while (fgets(line, LINE_MAX_LEN, file) != NULL) {
+		fflush(file);
+
+		char *newline = strchr(line, '\n');
+		if (newline != NULL) // Si hi ha \n a la linia, l'eliminam
+			*newline = '\0';
+
+		execute_line(line);
+	}
+
+	fclose(file);
+
+	return 1;
+}
 
 // Recorrera jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat)
 // Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash

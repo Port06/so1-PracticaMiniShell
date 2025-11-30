@@ -59,6 +59,7 @@ int internal_jobs();
 int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
+int execute_line(char* line);
 
 // M�tode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
@@ -215,7 +216,7 @@ int internal_export(char** args) {
         return 1;
     }
 
-    // Extrae el nombre de la variable
+	// Extrae el nombre de la variable
     size_t name_len = eq - pair;
     char* name = strndup_local(pair, name_len);
     if (!name) { perror(""); return 1; }
@@ -251,11 +252,37 @@ int internal_export(char** args) {
     return 1;
 }
 
-/* stubs coherentes */
+// internal_source: llegeix linia per linia un fitxer, i executa cada linia
 int internal_source(char** args) {
-	debug("[internal_source] This function will read and execute commands from a file in later phases.\n");
-	return 0;
-};
+	if (args == NULL || args[1] == NULL) {
+        fprintf(stderr, "source: expected file argument\n");
+        return 1;
+	}
+
+	debug("[internal_source] reading from file %s\n", args[1]);
+
+	FILE* file = fopen(args[1], "r");
+	if (file == NULL) {
+		perror("fopen");
+		return 1;
+	}
+
+	char line[LINE_MAX_LEN];
+
+	while (fgets(line, LINE_MAX_LEN, file) != NULL) {
+		fflush(file);
+
+		char *newline = strchr(line, '\n');
+		if (newline != NULL) // Si hi ha \n a la linia, l'eliminam
+			*newline = '\0';
+
+		execute_line(line);
+	}
+
+	fclose(file);
+
+	return 1;
+}
 
 int internal_jobs() {
 	debug("[internal_jobs] This function will list background jobs in later phases.\n");
