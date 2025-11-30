@@ -57,7 +57,7 @@ static char my_shell[LINE_MAX_LEN];
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
-int internal_jobs();
+int internal_jobs(char** args);
 int internal_fg(char** args);
 int internal_bg(char** args);
 int check_internal(char** args);
@@ -315,7 +315,7 @@ int internal_source(char** args) {
 
 // Recorrera jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat)
 // Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash
-int internal_jobs() {
+int internal_jobs(char** args) {
     for (int i = 1; i <= n_jobs; i++) {
         printf("[%d] %d\t%c\t%s\n",
             i,
@@ -459,15 +459,26 @@ int check_internal(char** args) {
 
 /* Ejecuta la linea: si interno -> ya manejado, si no -> fork + execvp */
 int execute_line(char* line) {
+	int isbg = is_background(line);
+
     char* argv[MAX_ARGS];
     char* cmd = line;
     int argc = parse_line(line, argv, MAX_ARGS);
 
-    if (argc == 0)
-        return 0;
+	if (argc == 0)
+		return 0;
 
-    if (check_internal(argv))
-        return 1;
+	if (check_internal(argv))
+		return 1;
+
+	// Inicialitzam mascares buides
+	sigset_t mask, oldmask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCHLD);
+
+	// Bloquejam temporalment SIGCHLD, de manera que el reaper no es pugui executar
+	// abans d'haver inicialitzat la llista de jobs
+	sigprocmask(SIG_BLOCK, &mask, &oldmask);
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -481,6 +492,10 @@ int execute_line(char* line) {
         signal(SIGINT, SIG_IGN); // Ignoram SIGINT
 		signal(SIGTSTP, SIG_IGN); // Ignoram SIGTSTP
 
+		// Necessitam restaurar la mascara anterior, perque execvp() preserva la
+		// mascara i volem que el fill no tengui restriccions
+		sigprocmask(SIG_SETMASK, &oldmask, NULL);
+
         // Executam la comanda
         execvp(argv[0], argv);
      
@@ -488,25 +503,25 @@ int execute_line(char* line) {
         _exit(EXIT_FAILURE);
     } else if (pid > 0) {
         // PARE
-        debug("[execute_line] fork: child PID is %d\n", pid);
 
-		if (is_background(cmd)) {
+        debug("[execute_line] fork: parent PID: %d (%s)]\n", getpid(), my_shell);
+        debug("[execute_line] fork: child PID: %d (%s)]\n", pid, cmd);
+
+		if (isbg) {
 			jobs_list_add(pid, 'E', cmd);
+			sigprocmask(SIG_SETMASK, &oldmask, NULL); // Permetem que el reaper actui
 		} else { // Introduim el process a la llista com a foreground
 			jobs_list[0].pid = pid;
 			jobs_list[0].status = 'E';
 			strncpy(jobs_list[0].cmd, cmd, LINE_MAX_LEN - 1);
 			jobs_list[0].cmd[LINE_MAX_LEN - 1] = '\0';
 
-			// TODO: wait for foreground execution using pause
-		}
- 
-        debug("[execute_line] parent PID: %d (%s)]\n", getpid(), my_shell);
-        debug("[execute_line] child PID: %d (%s)]\n", pid, cmd);
- 
-        while (jobs_list[0].pid != 0) {
-            pause();
-        }
+			sigprocmask(SIG_SETMASK, &oldmask, NULL); // Permetem que el reaper actui
+
+			while (jobs_list[0].pid != 0) {
+				pause();
+			}
+		} 
     } else {
         perror("fork");
     }
