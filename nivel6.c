@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,18 +143,24 @@ void internal_exit() {
 char* read_line(char* line, size_t len) {
 	print_prompt();
 
-	if (fgets(line, len, stdin) == NULL) {
-		if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
-			debug(DEBUG_N1, "\n[read_line] EOF\n");
-			internal_exit();
-		}
-		else {
-			return NULL;
+	// Bucle per reintentar llegir quan la lectura s'ha interromput per un senyal
+	while (1) {
+		if (fgets(line, len, stdin) == NULL) {
+			if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
+				debug(DEBUG_N1, "\n[read_line] EOF\n");
+				internal_exit();
+			} else if (errno != EINTR) {
+				return NULL;
+			}
+		} else {
+			break; // Si no hi ha cap error, no fa falta reintentem
 		}
 	}
 
 	char* newline = strchr(line, '\n');
-	if (newline != NULL) *newline = '\0'; // Eliminam la newline final, si n'hi ha
+	if (newline != NULL)
+		*newline = '\0'; // Eliminam la newline final, si n'hi ha
+
 	return line;
 }
 
