@@ -353,7 +353,7 @@ int internal_jobs(char** args) {
 	}
 
 	return 1;
-};
+}
 
 int internal_fg(char** args) {
 	debug("[internal_fg] This function will bring a background job to the foreground in later phases.\n");
@@ -372,6 +372,8 @@ void reaper(int signum) {
 	pid_t ended;
 	int status;
 
+	debug("[reaper] reaper invoked, waiting for children...\n");
+
 	// Recolectamos TODOS los hijos que hayan terminado sin bloquear
 	while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
 		int pos = jobs_list_find(ended);
@@ -379,18 +381,12 @@ void reaper(int signum) {
 		// Caso 1: el proceso terminó de forma normal (exit)
 		if (WIFEXITED(status)) {
 			int exitcode = WEXITSTATUS(status);
-			debug("[reaper] child process %d (%s) finished with exit code %d\n",
-				ended,
-				(jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
-				exitcode);
+			debug("[reaper] child process %d (%s) finished with exit code %d\n", ended, jobs_list[pos].cmd, exitcode);
 
 		// Caso 2: el proceso terminó por una señal
 		} else if (WIFSIGNALED(status)) {
 			int sig = WTERMSIG(status);
-			debug("[reaper] child process %d (%s) terminated by signal %d\n",
-				ended,
-				(jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
-				sig);
+			debug("[reaper] child process %d (%s) terminated by signal %d\n", ended, jobs_list[pos].cmd, sig);
 
 		// Caso 3: otro tipo de terminación (poco habitual)
 		} else {
@@ -409,6 +405,8 @@ void reaper(int signum) {
 			jobs_list_remove(pos);
 		} 
 	}
+
+	debug("[reaper] finished, returning...\n");
 }
 
 void ctrlc(int signum) {
@@ -418,7 +416,7 @@ void ctrlc(int signum) {
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
 
-	debug("[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
+	debug("\n[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
 		me,
 		my_shell,
 		fg,
@@ -445,13 +443,19 @@ void ctrlz(int signum) {
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
 
+	debug("\n[ctrlz] received by process %d (%s), foreground process is %d (%s)\n",
+		me,
+		my_shell,
+		fg,
+		(fg ? jobs_list[0].cmd : ""));
+
 	if (fg > 0) { // Hi ha processos en foreground
 		if (fg != me) {
-			if (kill(fg, SIGTSTP) == 0) {
-				debug("[ctrlz] signal SIGTSTP sent to %d by %d (%s)\n", fg, me, my_shell);
+			if (kill(fg, SIGSTOP) == 0) {
+				debug("[ctrlz] signal SIGSTOP sent to %d by %d (%s)\n", fg, me, my_shell);
 
 				// Movem el process de foreground al background
-				jobs_list_add(fg, jobs_list[0].status, jobs_list[0].cmd);
+				jobs_list_add(fg, 'D', jobs_list[0].cmd);
 
 				// Resetejam el job numero 0 (foreground), perque execute_line finalitzi
 				// l'execucio i tornem al bucle del main
@@ -460,10 +464,10 @@ void ctrlz(int signum) {
 				perror("kill");
 			}
 		} else {
-			debug("[ctrlz] signal SIGTSTP not sent by %d (%s): foreground process is the shell\n", me, my_shell);
+			debug("[ctrlz] signal SIGSTOP not sent by %d (%s): foreground process is the shell\n", me, my_shell);
 		}
 	} else {
-		debug("[ctrlz] signal SIGTSTP not sent by %d (%s): no foreground process\n", me, my_shell);
+		debug("[ctrlz] signal SIGSTOP not sent by %d (%s): no foreground process\n", me, my_shell);
 	}
 }
 
@@ -556,6 +560,7 @@ int execute_line(char* line) {
 			jobs_list[0].cmd[LINE_MAX_LEN - 1] = '\0';
 
 			sigprocmask(SIG_SETMASK, &oldmask, NULL); // Permetem que el reaper actui
+			debug("[execute_line] waiting for reaper\n");
 
 			while (jobs_list[0].pid != 0) {
 				pause();
