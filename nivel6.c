@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -157,6 +158,47 @@ int is_background(char *line) {
 
 	*found = '\0';
 	return 1;
+}
+
+// is_output_redirection: detecta si s'ha especificat redireccio de sortida (token '>'),
+// i en aquest cas configura la redireccio cap al fitxer especificat
+int is_output_redirection(char **args) {
+	char** curr = args;
+	int is_redir = 0;
+	char* file = NULL;
+
+	while (*curr != NULL) {
+		if (strcmp(*curr, ">") == 0) {
+			is_redir = 1;
+			*curr = NULL;
+			file = curr[1]; // TODO: imprimir error si no s'especifica fitxer
+		}
+
+		curr++;
+	}
+
+	if (is_redir)
+		debug("[is_output_redirection] output will be redirected to '%s'\n", file);
+	else
+		debug("[is_output_redirection] no output redirection\n");
+
+	if (!is_redir)
+		return 0;
+
+	int fd = open(file, O_WRONLY | O_CREAT, 0666);
+	if (fd < 0) {
+		perror("open");
+		return 0;
+	}
+
+	if (dup2(fd, 1) < 0) {
+		perror("dup2");
+		return 0;
+	}
+
+	close(fd);
+
+	return is_redir;
 }
 
 // parse_line: tokenitza i talla en '#' (comentaris). No afageix NULL com a token
@@ -610,7 +652,8 @@ int execute_line(char* line) {
 		// mascara i volem que el fill no tengui restriccions
 		sigprocmask(SIG_SETMASK, &oldmask, NULL);
 
-		// Executam la comanda
+		// Establim redireccio de sortida (si escau) i executam la comanda
+		is_output_redirection(argv);
 		execvp(argv[0], argv);
 
 		perror(argv[0]);
