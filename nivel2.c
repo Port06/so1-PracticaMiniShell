@@ -21,14 +21,21 @@
 #define ANSI_GREEN "\x1b[32m" // verd
 #define ANSI_YELLOW "\x1b[33m" // groc
 
-int debugN1 = 0;
-int debugN2 = 1;
+#define DEBUG_N1 1
+#define DEBUG_N2 1
+#define DEBUG_N3 0
+#define DEBUG_N4 0
+#define DEBUG_N5 0
+#define DEBUG_N6 0
 
-void debug(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    va_end(ap);
+void debug(int level, char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+
+	if (level)
+		vfprintf(stderr, fmt, ap);
+
+	va_end(ap);
 }
 
 // petit strndup local per si no existeix en el entorn
@@ -71,7 +78,7 @@ void print_prompt(void) {
 }
 
 void internal_exit() {
-    debug("exit\n");
+    debug(DEBUG_N1, "exit\n");
     printf("Bye Bye\n");
     exit(EXIT_SUCCESS);
 }
@@ -81,7 +88,7 @@ char* read_line(char* line, size_t len) {
 
     if (fgets(line, len, stdin) == NULL) {
         if (feof(stdin)) { // usuari ha pitjat Ctrl+D
-            debug("\n[read_line] EOF\n");
+            debug(DEBUG_N1, "\n[read_line] EOF\n");
             internal_exit();
         }
         else {
@@ -148,7 +155,7 @@ int parse_line(char* line, char** argv, int max_args) {
     argv[argc] = NULL;
 
     for (int i = 0; i <= argc; ++i)
-        debug("[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
+        debug(DEBUG_N1, "[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
 
     return argc;
 }
@@ -243,22 +250,22 @@ int internal_export(char** args) {
 
 // stubs coherents
 int internal_source(char** args) {
-	debug("[internal_source] This function will read and execute commands from a file in later phases.\n");
+	debug(DEBUG_N1, "[internal_source] This function will read and execute commands from a file in later phases.\n");
 	return 0;
 };
 
 int internal_jobs() {
-	debug("[internal_jobs] This function will list background jobs in later phases.\n");
+	debug(DEBUG_N1, "[internal_jobs] This function will list background jobs in later phases.\n");
 	return 0;
 };
 
 int internal_fg(char** args) {
-	debug("[internal_fg] This function will bring a background job to the foreground in later phases.\n");
+	debug(DEBUG_N1, "[internal_fg] This function will bring a background job to the foreground in later phases.\n");
 	return 0;
 };
 
 int internal_bg(char** args) {
-	debug("[internal_bg] This function will resume a suspended job in the background in later phases.\n");
+	debug(DEBUG_N1, "[internal_bg] This function will resume a suspended job in the background in later phases.\n");
 	return 0;
 };
 
@@ -266,7 +273,7 @@ int check_internal(char** args) {
     if (args == NULL || args[0] == NULL) return 0;
 
     if (strcmp(args[0], "exit") == 0) {
-        debug("[internal] exit\n");
+        debug(DEBUG_N1, "[internal] exit\n");
         internal_exit();
     }
     else if (strcmp(args[0], "cd") == 0) {

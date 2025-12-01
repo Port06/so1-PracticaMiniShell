@@ -22,14 +22,21 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
-int debugN1 = 0;
-int debugN2 = 1;
+#define DEBUG_N1 1
+#define DEBUG_N2 1
+#define DEBUG_N3 1
+#define DEBUG_N4 0
+#define DEBUG_N5 0
+#define DEBUG_N6 0
 
-void debug(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    va_end(ap);
+void debug(int level, char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+
+	if (level)
+		vfprintf(stderr, fmt, ap);
+
+	va_end(ap);
 }
 
 //pequeño strndup local por si no existe en el entorno
@@ -82,7 +89,7 @@ void print_prompt(void) {
 }
 
 void internal_exit() {
-    debug("exit\n");
+    debug(DEBUG_N1, "exit\n");
     printf("Bye Bye\n");
     exit(EXIT_SUCCESS);
 }
@@ -92,7 +99,7 @@ char* read_line(char* line, size_t len) {
 
     if (fgets(line, len, stdin) == NULL) {
         if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
-            debug("\n[read_line] EOF\n");
+            debug(DEBUG_N1, "\n[read_line] EOF\n");
             internal_exit();
         }
         else {
@@ -159,7 +166,7 @@ int parse_line(char* line, char** argv, int max_args) {
     argv[argc] = NULL;
 
     for (int i = 0; i <= argc; ++i)
-        debug("[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
+        debug(DEBUG_N1, "[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
 
     return argc;
 }
@@ -259,7 +266,7 @@ int internal_source(char** args) {
         return 1;
 	}
 
-	debug("[internal_source] reading from file %s\n", args[1]);
+	debug(DEBUG_N3, "[internal_source] reading from file %s\n", args[1]);
 
 	FILE* file = fopen(args[1], "r");
 	if (file == NULL) {
@@ -285,17 +292,17 @@ int internal_source(char** args) {
 }
 
 int internal_jobs() {
-	debug("[internal_jobs] This function will list background jobs in later phases.\n");
+	debug(DEBUG_N1, "[internal_jobs] This function will list background jobs in later phases.\n");
 	return 0;
 };
 
 int internal_fg(char** args) {
-	debug("[internal_fg] This function will bring a background job to the foreground in later phases.\n");
+	debug(DEBUG_N1, "[internal_fg] This function will bring a background job to the foreground in later phases.\n");
 	return 0;
 };
 
 int internal_bg(char** args) {
-	debug("[internal_bg] This function will resume a suspended job in the background in later phases.\n");
+	debug(DEBUG_N1, "[internal_bg] This function will resume a suspended job in the background in later phases.\n");
 	return 0;
 };
 
@@ -303,7 +310,7 @@ int check_internal(char** args) {
     if (args == NULL || args[0] == NULL) return 0;
 
     if (strcmp(args[0], "exit") == 0) {
-        debug("[internal] exit\n");
+        debug(DEBUG_N1, "[internal] exit\n");
         internal_exit();
     }
     else if (strcmp(args[0], "cd") == 0) {
@@ -346,15 +353,15 @@ int execute_line(char* line) {
     }
 
     if (pid == 0) {
-		debug("[execute_line] fork: parent pid is %d\n", getpid());
-		debug("[execute_line] shell is \"%s\"\n", my_shell);
-		debug("[execute_line] child cmd is \"%s\"\n", cmd);
+		debug(DEBUG_N3, "[execute_line] fork: parent pid is %d\n", getpid());
+		debug(DEBUG_N3, "[execute_line] shell is \"%s\"\n", my_shell);
+		debug(DEBUG_N3, "[execute_line] child cmd is \"%s\"\n", cmd);
 
         execvp(argv[0], argv);
         perror("");
         exit(EXIT_FAILURE);
     } else if (pid > 0) {
-		debug("[execute_line] fork: child pid is %d\n", pid);
+		debug(DEBUG_N3, "[execute_line] fork: child pid is %d\n", pid);
 
 		jobs_list[0].pid = pid;
 		jobs_list[0].status = 'E';
@@ -365,7 +372,7 @@ int execute_line(char* line) {
 			perror("waitpid");
 
 		if (WIFEXITED(status))
-			debug("[execute_line] child exited with status %d\n", WEXITSTATUS(status));
+			debug(DEBUG_N3, "[execute_line] child exited with status %d\n", WEXITSTATUS(status));
     } else {
 		perror("fork");
 	}

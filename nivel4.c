@@ -23,14 +23,21 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
-int debugN1 = 0;
-int debugN2 = 1;
+#define DEBUG_N1 1
+#define DEBUG_N2 1
+#define DEBUG_N3 1
+#define DEBUG_N4 1
+#define DEBUG_N5 0
+#define DEBUG_N6 0
 
-void debug(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    va_end(ap);
+void debug(int level, char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+
+	if (level)
+		vfprintf(stderr, fmt, ap);
+
+	va_end(ap);
 }
 
 //pequeño strndup local por si no existe en el entorno
@@ -83,7 +90,7 @@ void print_prompt(void) {
 }
 
 void internal_exit() {
-    debug("exit\n");
+    debug(DEBUG_N1, "exit\n");
     printf("Bye Bye\n");
     exit(EXIT_SUCCESS);
 }
@@ -93,7 +100,7 @@ char* read_line(char* line, size_t len) {
 
     if (fgets(line, len, stdin) == NULL) {
         if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
-            debug("\n[read_line] EOF\n");
+            debug(DEBUG_N1, "\n[read_line] EOF\n");
             internal_exit();
         }
         else {
@@ -160,7 +167,7 @@ int parse_line(char* line, char** argv, int max_args) {
     argv[argc] = NULL;
 
     for (int i = 0; i <= argc; ++i)
-        debug("[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
+        debug(DEBUG_N1, "[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
 
     return argc;
 }
@@ -193,7 +200,7 @@ int internal_cd(char** args) {
         return 1;
     }
 
-    debug("[internal_cd] %s\n", cwd);
+    debug(DEBUG_N2, "[internal_cd] %s\n", cwd);
     if (setenv("PWD", cwd, 1) != 0) {
         perror("cd");
         // no abortamos, ya cambiamos de directorio
@@ -235,9 +242,9 @@ int internal_export(char** args) {
 
     char* before = getenv(name);
     if (before != NULL)
-        debug("[internal_export] %s=%s\n", name, before);
+        debug(DEBUG_N2, "[internal_export] %s=%s\n", name, before);
     else
-        debug("[internal_export] %s was previously undefined\n", name);
+        debug(DEBUG_N2, "[internal_export] %s was previously undefined\n", name);
 
     // Define (o sobrescribe) la variable de entorno
     if (setenv(name, value, 1) != 0) {
@@ -248,7 +255,7 @@ int internal_export(char** args) {
 
     char* after = getenv(name);
     if (after != NULL)
-        debug("[internal_export] %s=%s\n", name, after);
+        debug(DEBUG_N2, "[internal_export] %s=%s\n", name, after);
     else
         fprintf(stderr, "export: error inesperado al leer %s\n", name);
 
@@ -265,7 +272,7 @@ int internal_source(char** args) {
         return 1;
 	}
 
-	debug("[internal_source] reading from file %s\n", args[1]);
+	debug(DEBUG_N3, "[internal_source] reading from file %s\n", args[1]);
 
 	FILE* file = fopen(args[1], "r");
 	if (file == NULL) {
@@ -291,17 +298,17 @@ int internal_source(char** args) {
 }
 
 int internal_jobs() {
-	debug("[internal_jobs] This function will list background jobs in later phases.\n");
+	debug(DEBUG_N1, "[internal_jobs] This function will list background jobs in later phases.\n");
 	return 0;
 };
 
 int internal_fg(char** args) {
-	debug("[internal_fg] This function will bring a background job to the foreground in later phases.\n");
+	debug(DEBUG_N1, "[internal_fg] This function will bring a background job to the foreground in later phases.\n");
 	return 0;
 };
 
 int internal_bg(char** args) {
-	debug("[internal_bg] This function will resume a suspended job in the background in later phases.\n");
+	debug(DEBUG_N1, "[internal_bg] This function will resume a suspended job in the background in later phases.\n");
 	return 0;
 };
 
@@ -318,7 +325,7 @@ void reaper(int signum) {
         // Caso 1: el proceso terminó de forma normal (exit)
         if (WIFEXITED(status)) {
             int exitcode = WEXITSTATUS(status);
-            debug("[reaper] child process %d (%s) finished with exit code %d\n",
+            debug(DEBUG_N4, "[reaper] child process %d (%s) finished with exit code %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 exitcode);
@@ -326,14 +333,14 @@ void reaper(int signum) {
             // Caso 2: el proceso terminó por una señal
         } else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
-            debug("[reaper] child process %d (%s) terminated by signal %d\n",
+            debug(DEBUG_N4, "[reaper] child process %d (%s) terminated by signal %d\n",
                 ended,
                 (jobs_list[0].pid == ended ? jobs_list[0].cmd : ""),
                 sig);
 
             // Caso 3: otro tipo de terminación (poco habitual)
         } else {
-            debug("[reaper] child process %d finished (status %d)\n", ended, status);
+            debug(DEBUG_N4, "[reaper] child process %d finished (status %d)\n", ended, status);
         }
 
         // Si el hijo que ha terminado era el proceso en foreground
@@ -353,7 +360,7 @@ void ctrlc(int signum) {
     pid_t fg = jobs_list[0].pid;
     pid_t me = getpid();
 
-    debug("[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
+    debug(DEBUG_N4, "[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
         me,
         my_shell,
         fg,
@@ -363,7 +370,7 @@ void ctrlc(int signum) {
         if (fg != me) {
             // enviar SIGTERM al proceso foreground (no al shell)
             if (kill(fg, SIGTERM) == 0) {
-                debug("[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n",
+                debug(DEBUG_N4, "[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n",
                     fg, jobs_list[0].cmd, me, my_shell);
             }
             else {
@@ -371,11 +378,11 @@ void ctrlc(int signum) {
             }
         }
         else {
-            debug("[ctrlc] signal 15 not sent by %d (%s): foreground process is the shell\n", me, my_shell);
+            debug(DEBUG_N4, "[ctrlc] signal 15 not sent by %d (%s): foreground process is the shell\n", me, my_shell);
         }
     }
     else {
-        debug("[ctrlc] signal 15 not sent by %d (%s): no foreground process\n", me, my_shell);
+        debug(DEBUG_N4, "[ctrlc] signal 15 not sent by %d (%s): no foreground process\n", me, my_shell);
     }
 
     fflush(stdout);
@@ -385,7 +392,7 @@ int check_internal(char** args) {
     if (args == NULL || args[0] == NULL) return 0;
 
     if (strcmp(args[0], "exit") == 0) {
-        debug("[internal] exit\n");
+        debug(DEBUG_N1, "[internal] exit\n");
         internal_exit();
     }
     else if (strcmp(args[0], "cd") == 0) {
@@ -440,7 +447,7 @@ int execute_line(char* line) {
     }
     else if (pid > 0) {
         // PARE
-        debug("[execute_line] fork: child PID is %d\n", pid);
+        debug(DEBUG_N3, "[execute_line] fork: child PID is %d\n", pid);
 
         jobs_list[0].pid = pid;
         jobs_list[0].status = 'E';
@@ -448,8 +455,8 @@ int execute_line(char* line) {
         jobs_list[0].cmd[LINE_MAX_LEN - 1] = '\0';
 
   
-        debug("[execute_line] parent PID: %d (%s)]\n", getpid(), my_shell);
-        debug("[execute_line] child PID: %d (%s)]\n", pid, cmd);
+        debug(DEBUG_N3, "[execute_line] parent PID: %d (%s)]\n", getpid(), my_shell);
+        debug(DEBUG_N3, "[execute_line] child PID: %d (%s)]\n", pid, cmd);
 
  
         while (jobs_list[0].pid != 0) {
