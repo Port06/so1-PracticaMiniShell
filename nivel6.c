@@ -63,6 +63,10 @@ int internal_bg(char** args);
 int check_internal(char** args);
 int execute_line(char* line);
 
+void print_job(int pos, struct info_job job) {
+	printf("[%d] %d\t%c\t%s\n", pos, job.pid, job.status, job.cmd);
+}
+
 // jobs_list_add: intenta afegir un job al final de la llista de jobs
 // retorna 0 si s'ha pogut afegir, o -1 en cas d'error (llista plena)
 int jobs_list_add(pid_t pid, char status, char *cmd) {
@@ -344,13 +348,8 @@ int internal_source(char** args) {
 int internal_jobs(char** args) {
 	debug("[internal_jobs] n_jobs = %d\n", n_jobs);
 
-	for (int i = 1; i < n_jobs; i++) {
-		printf("[%d] %d\t%c\t%s\n",
-			i,
-			jobs_list[i].pid,
-			jobs_list[i].status,
-			jobs_list[i].cmd);
-	}
+	for (int i = 1; i < n_jobs; i++)
+		print_job(i, jobs_list[i]);
 
 	return 1;
 }
@@ -390,7 +389,7 @@ int internal_fg(char** args) {
 
 	jobs_list_remove(pos); // i l'eliminam del background
 
-	printf("%s\n", job.cmd); // NO ha de ser debug
+	print_job(0, job);
 
 	while (jobs_list[0].pid != 0)
 		pause(); // Esperam fins que acabi el proces i sigui tractat pel reaper
@@ -399,9 +398,43 @@ int internal_fg(char** args) {
 }
 
 int internal_bg(char** args) {
-	debug("[internal_bg] This function will resume a suspended job in the background in later phases.\n");
-	return 0;
-};
+	if (args == NULL || args[1] == NULL) {
+        fprintf(stderr, "bg: expected job number argument\n");
+        return 1;
+	}
+
+	int pos = atoi(args[1]);
+
+	if (pos >= n_jobs || pos == 0) {
+		fprintf(stderr, "bg: no such job\n");
+		return 1;
+	}
+
+	struct info_job job = jobs_list[pos];
+
+	if (job.status == 'E') {
+		fprintf(stderr, "bg: job is already running in background\n");
+		return 1;
+	}
+
+	size_t cmdlen = strlen(job.cmd);
+
+	job.status = 'E';
+
+	// Afegim '&' al final
+	if (cmdlen + 3 <= LINE_MAX_LEN) {
+		strcat(job.cmd, " &");
+	} else {
+		job.cmd[cmdlen - 1] = '&'; // Si no ens hi cap, sobreescrivim la darrera lletra
+	}
+
+	kill(job.pid, SIGCONT);
+	debug("[internal_bg] signal SIGCONT sent to %d (%s)\n", job.pid, job.cmd);
+
+	print_job(pos, job);
+
+	return 1;
+}
 
 void reaper(int signum) {
 	(void)signum;  // Evita el warning de parámetro no usado (la señal recibida)
@@ -543,14 +576,18 @@ int execute_line(char* line) {
 	int isbg = is_background(line);
 
 	char* argv[MAX_ARGS];
-	char* cmd = line;
+	char* cmd = strdup(line);
 	int argc = parse_line(line, argv, MAX_ARGS);
 
-	if (argc == 0)
+	if (argc == 0) {
+		free(cmd);
 		return 0;
+	}
 
-	if (check_internal(argv))
+	if (check_internal(argv)) {
+		free(cmd);
 		return 1;
+	}
 
 	// Inicialitzam mascares buides
 	sigset_t mask, oldmask;
@@ -562,10 +599,6 @@ int execute_line(char* line) {
 	sigprocmask(SIG_BLOCK, &mask, &oldmask);
 
 	pid_t pid = fork();
-	if (pid < 0) {
-		perror("fork");
-		return -1;
-	}
 
 	if (pid == 0) {
 		// FILL
@@ -607,6 +640,7 @@ int execute_line(char* line) {
 		perror("fork");
 	}
 
+	free(cmd);
 	return 1;
 }
 
