@@ -307,7 +307,7 @@ int internal_cd(char** args) {
 	debug(DEBUG_N2, "[internal_cd] %s\n", cwd);
 	if (setenv("PWD", cwd, 1) != 0) {
 		perror("cd");
-		// No abortam, cambiam de directori
+		// No avortam, canviam de directori
 	}
 
 	return 1;
