@@ -78,8 +78,8 @@ void print_job(int pos, struct info_job job) {
 	printf("[%d] %d\t%c\t%s\n", pos, job.pid, job.status, job.cmd);
 }
 
-// jobs_list_add: intenta afegir un job al final de la llista de jobs
-// retorna la posicio del job si s'ha pogut afegir, o -1 en cas d'error (llista plena)
+/* jobs_list_add: intenta afegir un job al final de la llista de jobs
+   retorna la posicio del job si s'ha pogut afegir, o -1 en cas d'error (llista plena) */
 int jobs_list_add(pid_t pid, char status, char *cmd) {
 	if (n_jobs < N_JOBS) {
 		jobs_list[n_jobs].pid = pid;
@@ -94,8 +94,8 @@ int jobs_list_add(pid_t pid, char status, char *cmd) {
 	}
 }
 
-// jobs_list_find: cerca un proces amb PID determinat dins la llista de jobs
-// retorna la posicio del process, o -1 si no s'ha trobat
+/* jobs_list_find: cerca un proces amb PID determinat dins la llista de jobs
+   retorna la posicio del process, o -1 si no s'ha trobat */
 int jobs_list_find(pid_t pid) {
 	for (int i = 0; i < n_jobs; i++) {
 		if (jobs_list[i].pid == pid)
@@ -105,8 +105,8 @@ int jobs_list_find(pid_t pid) {
 	return -1;
 }
 
-// jobs_list_remove: elimina un job de la llista de jobs
-// retorna 0 si s'ha pogut eliminar, o -1 en cas d'error (posicio invalida)
+/* jobs_list_remove: elimina un job de la llista de jobs
+   retorna 0 si s'ha pogut eliminar, o -1 en cas d'error (posicio invalida) */
 int jobs_list_remove(int pos) {
 	if (pos >= n_jobs || pos < 0)
 		return -1;
@@ -116,7 +116,7 @@ int jobs_list_remove(int pos) {
 	return 0;
 }
 
-// Metode que imprimeix per pantalla la comanda de l'usuari
+/* Metode que imprimeix per pantalla la comanda de l'usuari */
 void print_prompt(void) {
 	char cwd[LINE_MAX_LEN];
 	const char* user = getenv("USER");
@@ -165,7 +165,7 @@ char* read_line(char* line, size_t len) {
 	return line;
 }
 
-// is_background: detecta '&' als arguments
+/* is_background: detecta '&' als arguments */
 int is_background(char *line) {
 	char *found = strchr(line, '&');
 	if (found == NULL)
@@ -175,8 +175,8 @@ int is_background(char *line) {
 	return 1;
 }
 
-// is_output_redirection: detecta si s'ha especificat redireccio de sortida (token '>'),
-// i en aquest cas configura la redireccio cap al fitxer especificat
+/* is_output_redirection: detecta si s'ha especificat redireccio de sortida (token '>'),
+   i en aquest cas configura la redireccio cap al fitxer especificat */
 int is_output_redirection(char **args) {
 	char** curr = args;
 	int is_redir = 0;
@@ -219,8 +219,8 @@ int is_output_redirection(char **args) {
 	return is_redir;
 }
 
-// parse_line: tokenitza i talla en '#' (comentaris). No afageix NULL com a token
-// parse_line que respeta comillas simples y dobles, y corta en '#' (comentarios)
+/* parse_line: tokenitza i talla en '#' (comentaris).No afageix NULL com a token
+   parse_line que respeta comillas simples y dobles, y corta en '#' (comentarios) */
 int parse_line(char* line, char** argv, int max_args) {
 	int argc = 0;
 	char* p = line;
@@ -281,7 +281,7 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
-// internal_cd: implementa cd sense args -> HOME, un arg, o varis (concatena i elimina les cometes)
+/* internal_cd: implementa cd sense args->HOME, un arg, o varis(concatena i elimina les cometes) */
 int internal_cd(char** args) {
 	char* target = NULL;
 	char cwd[LINE_MAX_LEN];
@@ -318,7 +318,7 @@ int internal_cd(char** args) {
 	return 1;
 }
 
-//internal_export: parsjea NOMBRE=VALOR en args[1], mostra avans y després (modo test)
+/* internal_export: parsjea NOMBRE = VALOR en args[1], mostra avans y després(modo test) */
 int internal_export(char** args) {
 	// Comprova que se vaji passant un argument (NOMBRE=VALOR)
 	if (args == NULL || args[1] == NULL) {
@@ -374,7 +374,7 @@ int internal_export(char** args) {
 	return 1;
 }
 
-// internal_source: llegeix linia per linia un fitxer, i executa cada llinia
+/* internal_source: llegeix linia per linia un fitxer, i executa cada llinia */
 int internal_source(char** args) {
 	// Comprovam que s'hagi passat el nom del fitxer
 	if (args == NULL || args[1] == NULL) {
@@ -409,8 +409,9 @@ int internal_source(char** args) {
 	return 1;
 }
 
-// Recorr jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la llinia de comandaments i l'estat (D de Detingut, E d'Executat)
-// Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash
+/* Recorr jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes
+   (a partir de l'1), el seu PID, la llinia de comandaments i l'estat (D de Detingut, E d'Executat)
+   Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash */
 int internal_jobs(char** args) {
 	debug(DEBUG_N5, "[internal_jobs] n_jobs = %d\n", n_jobs);
 
