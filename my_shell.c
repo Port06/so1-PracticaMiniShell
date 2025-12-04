@@ -2,15 +2,15 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <signal.h>
+#include <unistd.h>
 
 // Es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
@@ -51,9 +51,14 @@ struct info_job {
 	char cmd[LINE_MAX_LEN];
 };
 
-static int n_jobs = 1; // TODO: hauria de ser 0 o 1??
+static int n_jobs = 1; // Suposam la existencia d'un job de foreground
 static struct info_job jobs_list[N_JOBS];
 static char my_shell[LINE_MAX_LEN]; // Nom de la nostra shell (valor d'argv[0] dins main)
+
+static int prompt_status = 0; // Estat del prompt:
+							  // 0 --> mostrant prompt, cap input
+							  // <0 -> hem de mostrar el prompt
+							  // >0 -> ja tenim input, o el prompt no necessita ser mostrat
 
 // Prototips
 int internal_cd(char** args);
@@ -128,6 +133,8 @@ void print_prompt(void) {
 		ANSI_BOLD,
 		ANSI_RESET);
 	fflush(stdout);
+
+	prompt_status = 0;
 }
 
 void internal_exit() {
@@ -140,6 +147,9 @@ char* read_line(char* line, size_t len) {
 
 	// Bucle per reintentar llegir quan la lectura s'ha interromput per un senyal
 	while (1) {
+		if (prompt_status < 0) // Tornam a imprimir el prompt, si fa falta
+			print_prompt();
+
 		if (fgets(line, len, stdin) == NULL) {
 			if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
 				debug(DEBUG_N1, "\n[read_line] EOF\n");
@@ -155,6 +165,8 @@ char* read_line(char* line, size_t len) {
 	char* newline = strchr(line, '\n');
 	if (newline != NULL)
 		*newline = '\0'; // Eliminam la newline final, si n'hi ha
+
+	prompt_status = 1;
 
 	return line;
 }
@@ -181,7 +193,12 @@ int is_output_redirection(char **args) {
 		if (strcmp(*curr, ">") == 0) {
 			is_redir = 1;
 			*curr = NULL;
-			file = curr[1]; // TOT: imprimir error si no s'especifica fitxer
+
+			file = curr[1];
+			if (file == NULL) {
+				fprintf(stderr, "%s: no file specified for output redirection\n", my_shell);
+				return 0;
+			}
 		}
 
 		curr++;
@@ -567,7 +584,11 @@ void reaper(int signum) {
 			jobs_list[0].status = 'F';
 			jobs_list[0].cmd[0] = '\0';
 		} else {
-			// TODO: aqui que hem d'imprimir exactament?
+			if (prompt_status <= 0) {
+				putchar('\n'); // Escrivim una linia nova si fa falta
+				prompt_status = -1;
+			}
+
 			printf("child process %d (%s) ended\n", jobs_list[pos].pid, jobs_list[pos].cmd); // NO ha de ser debug, s'ha d'imprimir sempre
 
 			jobs_list_remove(pos);
@@ -578,9 +599,9 @@ void reaper(int signum) {
 }
 
 void ctrlc(int signum) {
-	(void)signum;
 	signal(SIGINT, ctrlc); // Re-armar el manejador
 	putchar('\n');
+	prompt_status = -1;
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
@@ -609,6 +630,7 @@ void ctrlc(int signum) {
 void ctrlz(int signum) {
 	signal(SIGTSTP, ctrlz); // Re-armar el manejador
 	putchar('\n');
+	prompt_status = -1;
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
@@ -675,7 +697,6 @@ int check_internal(char** args) {
 
 /* Ejecuta la linea: si interno -> ya manejado, si no -> fork + execvp */
 int execute_line(char* line) {
-
 	char* argv[MAX_ARGS];
 	char* cmd = strdup(line); // Hem de duplicar primer el cmd perque is_background el modifica
 	int isbg = is_background(line);
