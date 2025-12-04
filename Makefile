@@ -1,4 +1,3 @@
-# Adelaida
 CC=gcc
 CFLAGS=-c -g -Wall -std=c17
 #LDFLAGS=-lreadline -Incurses #activar usar readline
