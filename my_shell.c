@@ -25,6 +25,7 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
+// Variables de debug
 #define DEBUG_N1 0
 #define DEBUG_N2 0
 #define DEBUG_N3 0
@@ -32,6 +33,7 @@
 #define DEBUG_N5 0
 #define DEBUG_N6 0
 
+// Mètode que inicialitza els debugs
 void debug(int level, char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
@@ -42,7 +44,7 @@ void debug(int level, char *fmt, ...) {
 	va_end(ap);
 }
 
-//pequeño strndup local por si no existe en el entorno
+// Petit strndup local por si no existeix en l'entorn
 static char* strndup_local(const char* s, size_t n) {
 	size_t len = strnlen(s, n);
 	char* p = malloc(len + 1);
@@ -62,7 +64,7 @@ static int n_jobs = 1; // TODO: hauria de ser 0 o 1??
 static struct info_job jobs_list[N_JOBS];
 static char my_shell[LINE_MAX_LEN];
 
-// prototipos
+// Definicions
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
@@ -110,12 +112,12 @@ int jobs_list_remove(int pos) {
 	if (pos >= n_jobs || pos < 0)
 		return -1;
 
-	// decrementam primer n_jobs i despres intercanviam el darrer job amb el job situat a pos
+	// Decrementam primer n_jobs i despres intercanviam el darrer job amb el job situat a pos
 	jobs_list[pos] = jobs_list[--n_jobs];
 	return 0;
 }
 
-// M�tode que imprimeix per pantalla la comanda de l'usuari
+// Metode que imprimeix per pantalla la comanda de l'usuari
 void print_prompt(void) {
 	char cwd[LINE_MAX_LEN];
 	const char* user = getenv("USER");
@@ -185,7 +187,7 @@ int is_output_redirection(char **args) {
 		if (strcmp(*curr, ">") == 0) {
 			is_redir = 1;
 			*curr = NULL;
-			file = curr[1]; // TODO: imprimir error si no s'especifica fitxer
+			file = curr[1]; // TOT: imprimir error si no s'especifica fitxer
 		}
 
 		curr++;
@@ -402,7 +404,7 @@ int internal_source(char** args) {
 	return 1;
 }
 
-// Recorrera jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat)
+// Recorr jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la llinia de comandaments i l'estat (D de Detingut, E d'Executat)
 // Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash
 int internal_jobs(char** args) {
 	debug(DEBUG_N5, "[internal_jobs] n_jobs = %d\n", n_jobs);
@@ -504,21 +506,21 @@ void reaper(int signum) {
 
 	debug(DEBUG_N4, "[reaper] reaper invoked, waiting for children...\n");
 
-	// Recolectamos TODOS los hijos que hayan terminado sin bloquear
+	// Recollim tots els fills que vagin terminant sense bloquetja
 	while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
 		int pos = jobs_list_find(ended);
 
-		// Caso 1: el proceso terminó de forma normal (exit)
+		// Caso 1: el procés termina de forma normal (exit)
 		if (WIFEXITED(status)) {
 			int exitcode = WEXITSTATUS(status);
 			debug(DEBUG_N4, "[reaper] child process %d (%s) finished with exit code %d\n", ended, jobs_list[pos].cmd, exitcode);
 
-		// Caso 2: el proceso terminó por una señal
+		// Caso 2: el procés termina per una senyal
 		} else if (WIFSIGNALED(status)) {
 			int sig = WTERMSIG(status);
 			debug(DEBUG_N4, "[reaper] child process %d (%s) terminated by signal %d\n", ended, jobs_list[pos].cmd, sig);
 
-		// Caso 3: otro tipo de terminación (poco habitual)
+		// Caso 3: altre tipus de terminació (poco habitual)
 		} else {
 			debug(DEBUG_N4, "[reaper] child process %d finished (status %d)\n", ended, status);
 		}
@@ -529,7 +531,6 @@ void reaper(int signum) {
 			jobs_list[0].status = 'F';
 			jobs_list[0].cmd[0] = '\0';
 		} else {
-			// TODO: aqui que hem d'imprimir exactament?
 			printf("child process %d (%s) ended\n", jobs_list[pos].pid, jobs_list[pos].cmd); // NO ha de ser debug, s'ha d'imprimir sempre
 
 			jobs_list_remove(pos);
@@ -541,7 +542,7 @@ void reaper(int signum) {
 
 void ctrlc(int signum) {
 	(void)signum;
-	signal(SIGINT, ctrlc); // re-armar el manejador
+	signal(SIGINT, ctrlc); // Re-armar el manejador
 	putchar('\n');
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
@@ -555,7 +556,7 @@ void ctrlc(int signum) {
 
 	if (fg > 0) {
 		if (fg != me) {
-			// enviar SIGTERM al proceso foreground (no al shell)
+			// Enviar SIGTERM al procés foreground (no al shell)
 			if (kill(fg, SIGTERM) == 0)
 				debug(DEBUG_N4, "[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n", fg, jobs_list[0].cmd, me, my_shell);
 			else
@@ -569,7 +570,7 @@ void ctrlc(int signum) {
 }
 
 void ctrlz(int signum) {
-	signal(SIGTSTP, ctrlz); // re-armar el manejador
+	signal(SIGTSTP, ctrlz); // Re-armar el manejador
 	putchar('\n');
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
@@ -603,6 +604,8 @@ void ctrlz(int signum) {
 	}
 }
 
+
+/* Mètodo que escull l'acció a realitzar */
 int check_internal(char** args) {
 	if (args == NULL || args[0] == NULL)
 		return 0;
