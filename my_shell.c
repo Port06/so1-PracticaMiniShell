@@ -247,7 +247,10 @@ int parse_line(char* line, char** argv, int max_args) {
 		}
 		else {
 			char* start = p;
-			while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') p++;
+			while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') {
+				if (*p == '\\' && *(p + 1) != '\0') p += 2; // permitir escapes simples
+				else p++;
+			}
 			if (*p == '#') {
 				// terminar token y descartar resto -> comentario
 				*p = '\0';
