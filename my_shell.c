@@ -33,7 +33,8 @@
 #define DEBUG_N5 0
 #define DEBUG_N6 0
 
-// Mètode que inicialitza els debugs
+// debug: imprimeix un missatge de debug corresponent al nivell `level`, amb
+// el mateix formateig que printf. El missatge s'imprimeix a stderr
 void debug(int level, char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
@@ -44,16 +45,6 @@ void debug(int level, char *fmt, ...) {
 	va_end(ap);
 }
 
-// Petit strndup local por si no existeix en l'entorn
-static char* strndup_local(const char* s, size_t n) {
-	size_t len = strnlen(s, n);
-	char* p = malloc(len + 1);
-	if (!p) return NULL;
-	memcpy(p, s, len);
-	p[len] = '\0';
-	return p;
-}
-
 struct info_job {
 	pid_t pid;
 	char status;
@@ -62,9 +53,9 @@ struct info_job {
 
 static int n_jobs = 1; // TODO: hauria de ser 0 o 1??
 static struct info_job jobs_list[N_JOBS];
-static char my_shell[LINE_MAX_LEN];
+static char my_shell[LINE_MAX_LEN]; // Nom de la nostra shell (valor d'argv[0] dins main)
 
-// Definicions
+// Prototips
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
@@ -74,6 +65,7 @@ int internal_bg(char** args);
 int check_internal(char** args);
 int execute_line(char* line);
 
+// print_job: imprimeix la informacio d'un job (situat a la posicio pos de la llista)
 void print_job(int pos, struct info_job job) {
 	printf("[%d] %d\t%c\t%s\n", pos, job.pid, job.status, job.cmd);
 }
@@ -116,11 +108,13 @@ int jobs_list_remove(int pos) {
 	return 0;
 }
 
-/* Metode que imprimeix per pantalla la comanda de l'usuari */
+// print_prompt: imprimeix per pantalla (stdout) el prompt d'usuari, amb el
+// format '[usuari:directori] $'
 void print_prompt(void) {
 	char cwd[LINE_MAX_LEN];
 	const char* user = getenv("USER");
-	if (user == NULL) user = "user";
+	if (user == NULL)
+		user = "user";
 
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		strncpy(cwd, "?", sizeof(cwd));
@@ -219,8 +213,8 @@ int is_output_redirection(char **args) {
 	return is_redir;
 }
 
-/* parse_line: tokenitza i talla en '#' (comentaris).No afageix NULL com a token
-   parse_line que respeta comillas simples y dobles, y corta en '#' (comentarios) */
+/* parse_line: tokenitza (respectant cometes simples i dobles), i talla a partir
+   de '#' (comentaris) */
 int parse_line(char* line, char** argv, int max_args) {
 	int argc = 0;
 	char* p = line;
@@ -256,7 +250,7 @@ int parse_line(char* line, char** argv, int max_args) {
 				else p++;
 			}
 			if (*p == '#') {
-				// Termina els tokens y acaba amb la resta
+				// Termina els tokens i acaba amb la resta
 				*p = '\0';
 				argv[argc++] = start;
 				break;
@@ -281,12 +275,13 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
-/* internal_cd: implementa cd sense args->HOME, un arg, o varis(concatena i elimina les cometes) */
+/* internal_cd: implementa cd sense args (equivalent a HOME), un arg, o varis
+   (concatena i elimina les cometes) */
 int internal_cd(char** args) {
 	char* target = NULL;
 	char cwd[LINE_MAX_LEN];
 
-	// Si no hi ha arguments retorna a home
+	// Si no hi ha arguments retorna a HOME
 	if (args == NULL || args[1] == NULL) {
 		target = getenv("HOME");
 		if (target == NULL) {
@@ -295,7 +290,7 @@ int internal_cd(char** args) {
 		}
 	}
 	else {
-		target = args[1];  // El parser retorna la ruta completa, sense cometes
+		target = args[1]; // El parser retorna la ruta completa, sense cometes
 	}
 
 	if (chdir(target) != 0) {
@@ -303,7 +298,7 @@ int internal_cd(char** args) {
 		return 1;
 	}
 
-	// Actualitzar PWD y mostrar cwd
+	// Actualitzar PWD i mostrar cwd
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		perror("cd");
 		return 1;
@@ -318,9 +313,10 @@ int internal_cd(char** args) {
 	return 1;
 }
 
-/* internal_export: parsjea NOMBRE = VALOR en args[1], mostra avans y després(modo test) */
+/* internal_export: parseja NOM=VALOR en args[1], canvia el valor de la variable
+   d'entorn especificada, i mostra abans i despres (a mode de debug) */
 int internal_export(char** args) {
-	// Comprova que se vaji passant un argument (NOMBRE=VALOR)
+	// Comprova que se passi un argument (NOM=VALOR)
 	if (args == NULL || args[1] == NULL) {
 		fprintf(stderr, "export: correct syntax: export NAME=VALUE\n");
 		return 1;
@@ -336,7 +332,7 @@ int internal_export(char** args) {
 
 	// Extreu el nom de la variable
 	size_t name_len = eq - pair;
-	char* name = strndup_local(pair, name_len);
+	char* name = strndup(pair, name_len);
 	if (!name) {
 		perror("");
 		return 1;
@@ -374,7 +370,7 @@ int internal_export(char** args) {
 	return 1;
 }
 
-/* internal_source: llegeix linia per linia un fitxer, i executa cada llinia */
+/* internal_source: llegeix linia per linia un fitxer, i executa cada linia */
 int internal_source(char** args) {
 	// Comprovam que s'hagi passat el nom del fitxer
 	if (args == NULL || args[1] == NULL) {
@@ -410,8 +406,7 @@ int internal_source(char** args) {
 }
 
 /* Recorr jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes
-   (a partir de l'1), el seu PID, la llinia de comandaments i l'estat (D de Detingut, E d'Executat)
-   Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash */
+   (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat) */
 int internal_jobs(char** args) {
 	debug(DEBUG_N5, "[internal_jobs] n_jobs = %d\n", n_jobs);
 
@@ -507,24 +502,23 @@ int internal_bg(char** args) {
 }
 
 void reaper(int signum) {
-	(void)signum;  // Evita el warning de parámetro no usado (la señal recibida)
-	signal(SIGCHLD, reaper);  // Reasociamos el manejador a la señal SIGCHLD
+	signal(SIGCHLD, reaper); // Re-armar el manejador
 
 	pid_t ended;
 	int status;
 
 	debug(DEBUG_N4, "[reaper] reaper invoked, waiting for children...\n");
 
-	// Recollim tots els fills que vagin terminant sense bloquetja
+	// Recollim tots els fills que vagin terminant sense bloquetjar
 	while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
 		int pos = jobs_list_find(ended);
 
-		// Caso 1: el procés termina de forma normal (exit)
+		// Caso 1: el proces termina de forma normal (exit)
 		if (WIFEXITED(status)) {
 			int exitcode = WEXITSTATUS(status);
 			debug(DEBUG_N4, "[reaper] child process %d (%s) finished with exit code %d\n", ended, jobs_list[pos].cmd, exitcode);
 
-		// Caso 2: el procés termina per una senyal
+		// Caso 2: el proces termina per un senyal
 		} else if (WIFSIGNALED(status)) {
 			int sig = WTERMSIG(status);
 			debug(DEBUG_N4, "[reaper] child process %d (%s) terminated by signal %d\n", ended, jobs_list[pos].cmd, sig);
@@ -540,6 +534,7 @@ void reaper(int signum) {
 			jobs_list[0].status = 'F';
 			jobs_list[0].cmd[0] = '\0';
 		} else {
+			// TODO: aqui que hem d'imprimir exactament?
 			printf("child process %d (%s) ended\n", jobs_list[pos].pid, jobs_list[pos].cmd); // NO ha de ser debug, s'ha d'imprimir sempre
 
 			jobs_list_remove(pos);
@@ -614,8 +609,8 @@ void ctrlz(int signum) {
 	}
 }
 
-
-/* Mètodo que escull l'acció a realitzar */
+// check_internal: comprova si la comanda especificada per args es interna.
+// Retorna 0 si no ho es, o un enter diferent de 0 si es intern
 int check_internal(char** args) {
 	if (args == NULL || args[0] == NULL)
 		return 0;
@@ -732,7 +727,7 @@ int main(int argc, char** argv) {
 
 	strncpy(my_shell, argv[0], LINE_MAX_LEN);
 
-	// Llegim les llinies de texte de l'usuari
+	// Llegim les linies de text de l'usuari
 	while (1) {
 		char line[LINE_MAX_LEN];
 		if (read_line(line, sizeof(line)) == NULL)
