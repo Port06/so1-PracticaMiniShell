@@ -222,14 +222,14 @@ int parse_line(char* line, char** argv, int max_args) {
 	char* p = line;
 
 	while (*p != '\0' && argc < max_args - 1) {
-		// saltar espacios
+		// Evitar els caracters no desitjats per executar les comandes
 		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
 		if (*p == '\0' || *p == '#') break;
 
 		if (*p == '"' || *p == '\'') {
 			char quote = *p++;
 			char* start = p;
-			// buscar cierre de comilla
+			// Trobar el final de les cometes
 			while (*p != '\0' && *p != quote) {
 				if (*p == '\\' && *(p + 1) != '\0') p += 2; // permitir escapes simples
 				else p++;
@@ -237,10 +237,10 @@ int parse_line(char* line, char** argv, int max_args) {
 			if (*p == quote) {
 				*p = '\0';
 				argv[argc++] = start;
-				p++; // avanzar después de la comilla final
+				p++; // Avançar una posició darrera les cometes
 			}
 			else {
-				// comilla no cerrada: tomar hasta el final
+				// Si la cometa no tanca s'agafa tot el que queda
 				argv[argc++] = start;
 				break;
 			}
@@ -248,11 +248,11 @@ int parse_line(char* line, char** argv, int max_args) {
 		else {
 			char* start = p;
 			while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') {
-				if (*p == '\\' && *(p + 1) != '\0') p += 2; // permitir escapes simples
+				if (*p == '\\' && *(p + 1) != '\0') p += 2; // Es permet l'us d'espais simples
 				else p++;
 			}
 			if (*p == '#') {
-				// terminar token y descartar resto -> comentario
+				// Termina els tokens y acaba amb la resta
 				*p = '\0';
 				argv[argc++] = start;
 				break;
@@ -277,12 +277,12 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
-// internal_cd: implementa cd sin args -> HOME, un arg, o varios (concatena y quita comillas)
+// internal_cd: implementa cd sense args -> HOME, un arg, o varis (concatena i elimina les cometes)
 int internal_cd(char** args) {
 	char* target = NULL;
 	char cwd[LINE_MAX_LEN];
 
-	// Si no hay argumento -> HOME
+	// Si no hi ha arguments retorna a home
 	if (args == NULL || args[1] == NULL) {
 		target = getenv("HOME");
 		if (target == NULL) {
@@ -291,7 +291,7 @@ int internal_cd(char** args) {
 		}
 	}
 	else {
-		target = args[1];  // El parser ya devuelve la ruta completa, sin comillas
+		target = args[1];  // El parser retorna la ruta completa, sense cometes
 	}
 
 	if (chdir(target) != 0) {
@@ -299,7 +299,7 @@ int internal_cd(char** args) {
 		return 1;
 	}
 
-	// Actualizar PWD y mostrar cwd
+	// Actualitzar PWD y mostrar cwd
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		perror("cd");
 		return 1;
@@ -308,21 +308,21 @@ int internal_cd(char** args) {
 	debug(DEBUG_N2, "[internal_cd] %s\n", cwd);
 	if (setenv("PWD", cwd, 1) != 0) {
 		perror("cd");
-		// no abortamos, ya cambiamos de directorio
+		// No abortam, cambiam de directori
 	}
 
 	return 1;
 }
 
-//internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test)
+//internal_export: parsjea NOMBRE=VALOR en args[1], mostra avans y després (modo test)
 int internal_export(char** args) {
-	// Comprueba que se haya pasado un argumento (NOMBRE=VALOR)
+	// Comprova que se vaji passant un argument (NOMBRE=VALOR)
 	if (args == NULL || args[1] == NULL) {
 		fprintf(stderr, "export: correct syntax: export NAME=VALUE\n");
 		return 1;
 	}
 
-	// Separa el nombre y el valor buscando '='
+	// Separa el nom i el valor cercant '='
 	char* pair = args[1];
 	char* eq = strchr(pair, '=');
 	if (eq == NULL || eq == pair) {
@@ -330,7 +330,7 @@ int internal_export(char** args) {
 		return 1;
 	}
 
-	// Extrae el nombre de la variable
+	// Extreu el nom de la variable
 	size_t name_len = eq - pair;
 	char* name = strndup_local(pair, name_len);
 	if (!name) {
@@ -351,7 +351,7 @@ int internal_export(char** args) {
 	else
 		debug(DEBUG_N2, "[internal_export] %s was previously undefined\n", name);
 
-	// Define (o sobrescribe) la variable de entorno
+	// Defineix (o sobrescriu) la variable d'entorn
 	if (setenv(name, value, 1) != 0) {
 		perror("");
 		free(name); free(value);
@@ -364,13 +364,13 @@ int internal_export(char** args) {
 	else
 		fprintf(stderr, "export: unexpected error while reading %s\n", name);
 
-	// Libera la memoria reservada
+	// Llibera la memoria reservada
 	free(name);
 	free(value);
 	return 1;
 }
 
-// internal_source: llegeix linia per linia un fitxer, i executa cada linia
+// internal_source: llegeix linia per linia un fitxer, i executa cada llinia
 int internal_source(char** args) {
 	if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "source: expected file argument\n");
