@@ -2,15 +2,15 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <signal.h>
+#include <unistd.h>
 
 // Es defineix el tamany i els arguments limit d'una comanda
 #define LINE_MAX_LEN 1024
@@ -25,6 +25,7 @@
 #define ANSI_GREEN "\x1b[32m" // Verd
 #define ANSI_YELLOW "\x1b[33m" // Groc
 
+// Variables de debug
 #define DEBUG_N1 1
 #define DEBUG_N2 1
 #define DEBUG_N3 1
@@ -32,6 +33,8 @@
 #define DEBUG_N5 1
 #define DEBUG_N6 1
 
+// debug: imprimeix un missatge de debug corresponent al nivell `level`, amb
+// el mateix formateig que printf. El missatge s'imprimeix a stderr
 void debug(int level, char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
@@ -42,27 +45,22 @@ void debug(int level, char *fmt, ...) {
 	va_end(ap);
 }
 
-//pequeño strndup local por si no existe en el entorno
-static char* strndup_local(const char* s, size_t n) {
-	size_t len = strnlen(s, n);
-	char* p = malloc(len + 1);
-	if (!p) return NULL;
-	memcpy(p, s, len);
-	p[len] = '\0';
-	return p;
-}
-
 struct info_job {
 	pid_t pid;
 	char status;
 	char cmd[LINE_MAX_LEN];
 };
 
-static int n_jobs = 1; // TODO: hauria de ser 0 o 1??
+static int n_jobs = 1; // Suposam la existencia d'un job de foreground
 static struct info_job jobs_list[N_JOBS];
-static char my_shell[LINE_MAX_LEN];
+static char my_shell[LINE_MAX_LEN]; // Nom de la nostra shell (valor d'argv[0] dins main)
 
-// prototipos
+static int prompt_status = 0; // Estat del prompt:
+							  // 0 --> mostrant prompt, cap input
+							  // <0 -> hem de mostrar el prompt
+							  // >0 -> ja tenim input, o el prompt no necessita ser mostrat
+
+// Prototips
 int internal_cd(char** args);
 int internal_export(char** args);
 int internal_source(char** args);
@@ -72,12 +70,13 @@ int internal_bg(char** args);
 int check_internal(char** args);
 int execute_line(char* line);
 
+// print_job: imprimeix la informacio d'un job (situat a la posicio pos de la llista)
 void print_job(int pos, struct info_job job) {
 	printf("[%d] %d\t%c\t%s\n", pos, job.pid, job.status, job.cmd);
 }
 
-// jobs_list_add: intenta afegir un job al final de la llista de jobs
-// retorna 0 si s'ha pogut afegir, o -1 en cas d'error (llista plena)
+/* jobs_list_add: intenta afegir un job al final de la llista de jobs
+   retorna la posicio del job si s'ha pogut afegir, o -1 en cas d'error (llista plena) */
 int jobs_list_add(pid_t pid, char status, char *cmd) {
 	if (n_jobs < N_JOBS) {
 		jobs_list[n_jobs].pid = pid;
@@ -86,15 +85,14 @@ int jobs_list_add(pid_t pid, char status, char *cmd) {
 		strncpy(jobs_list[n_jobs].cmd, cmd, LINE_MAX_LEN - 1);
 		jobs_list[n_jobs].cmd[LINE_MAX_LEN - 1] = '\0';
 
-		n_jobs++;
-		return 0;
+		return n_jobs++;
 	} else {
 		return -1;
 	}
 }
 
-// jobs_list_find: cerca un proces amb PID determinat dins la llista de jobs
-// retorna la posicio del process, o -1 si no s'ha trobat
+/* jobs_list_find: cerca un proces amb PID determinat dins la llista de jobs
+   retorna la posicio del process, o -1 si no s'ha trobat */
 int jobs_list_find(pid_t pid) {
 	for (int i = 0; i < n_jobs; i++) {
 		if (jobs_list[i].pid == pid)
@@ -104,22 +102,24 @@ int jobs_list_find(pid_t pid) {
 	return -1;
 }
 
-// jobs_list_remove: elimina un job de la llista de jobs
-// retorna 0 si s'ha pogut eliminar, o -1 en cas d'error (posicio invalida)
+/* jobs_list_remove: elimina un job de la llista de jobs
+   retorna 0 si s'ha pogut eliminar, o -1 en cas d'error (posicio invalida) */
 int jobs_list_remove(int pos) {
 	if (pos >= n_jobs || pos < 0)
 		return -1;
 
-	// decrementam primer n_jobs i despres intercanviam el darrer job amb el job situat a pos
+	// Decrementam primer n_jobs i despres intercanviam el darrer job amb el job situat a pos
 	jobs_list[pos] = jobs_list[--n_jobs];
 	return 0;
 }
 
-// M�tode que imprimeix per pantalla la comanda de l'usuari
+// print_prompt: imprimeix per pantalla (stdout) el prompt d'usuari, amb el
+// format '[usuari:directori] $'
 void print_prompt(void) {
 	char cwd[LINE_MAX_LEN];
 	const char* user = getenv("USER");
-	if (user == NULL) user = "user";
+	if (user == NULL)
+		user = "user";
 
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		strncpy(cwd, "?", sizeof(cwd));
@@ -133,6 +133,8 @@ void print_prompt(void) {
 		ANSI_BOLD,
 		ANSI_RESET);
 	fflush(stdout);
+
+	prompt_status = 0;
 }
 
 void internal_exit() {
@@ -145,6 +147,9 @@ char* read_line(char* line, size_t len) {
 
 	// Bucle per reintentar llegir quan la lectura s'ha interromput per un senyal
 	while (1) {
+		if (prompt_status < 0) // Tornam a imprimir el prompt, si fa falta
+			print_prompt();
+
 		if (fgets(line, len, stdin) == NULL) {
 			if (feof(stdin)) { // Usuari ha pitjat Ctrl+D
 				debug(DEBUG_N1, "\n[read_line] EOF\n");
@@ -161,10 +166,12 @@ char* read_line(char* line, size_t len) {
 	if (newline != NULL)
 		*newline = '\0'; // Eliminam la newline final, si n'hi ha
 
+	prompt_status = 1;
+
 	return line;
 }
 
-// is_background: detecta '&' als arguments
+/* is_background: detecta '&' als arguments */
 int is_background(char *line) {
 	char *found = strchr(line, '&');
 	if (found == NULL)
@@ -174,18 +181,24 @@ int is_background(char *line) {
 	return 1;
 }
 
-// is_output_redirection: detecta si s'ha especificat redireccio de sortida (token '>'),
-// i en aquest cas configura la redireccio cap al fitxer especificat
+/* is_output_redirection: detecta si s'ha especificat redireccio de sortida (token '>'),
+   i en aquest cas configura la redireccio cap al fitxer especificat */
 int is_output_redirection(char **args) {
 	char** curr = args;
 	int is_redir = 0;
 	char* file = NULL;
 
+	// Recorrem tots els arguments cercant el símbol '>'
 	while (*curr != NULL) {
 		if (strcmp(*curr, ">") == 0) {
 			is_redir = 1;
 			*curr = NULL;
-			file = curr[1]; // TODO: imprimir error si no s'especifica fitxer
+
+			file = curr[1];
+			if (file == NULL) {
+				fprintf(stderr, "%s: no file specified for output redirection\n", my_shell);
+				return 0;
+			}
 		}
 
 		curr++;
@@ -199,12 +212,14 @@ int is_output_redirection(char **args) {
 	if (!is_redir)
 		return 0;
 
+	// Obrim (o cream) el fitxer on s'escriurà la sortida
 	int fd = open(file, O_WRONLY | O_CREAT, 0666);
 	if (fd < 0) {
 		perror("open");
 		return 0;
 	}
 
+	// Redireccionam stdout (descriptor 1) cap al fitxer
 	if (dup2(fd, 1) < 0) {
 		perror("dup2");
 		return 0;
@@ -215,58 +230,94 @@ int is_output_redirection(char **args) {
 	return is_redir;
 }
 
-// parse_line: tokenitza i talla en '#' (comentaris). No afageix NULL com a token
-// parse_line que respeta comillas simples y dobles, y corta en '#' (comentarios)
+/* parse_line: tokenitza (respectant cometes simples i dobles), i talla a partir
+   de '#' (comentaris) */
 int parse_line(char* line, char** argv, int max_args) {
 	int argc = 0;
 	char* p = line;
 
 	while (*p != '\0' && argc < max_args - 1) {
-		// saltar espacios
-		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
-		if (*p == '\0' || *p == '#') break;
+		// Evitar els caracters no desitjats per executar les comandes
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
+
+		if (*p == '\0' || *p == '#')
+			break;
 
 		if (*p == '"' || *p == '\'') {
 			char quote = *p++;
 			char* start = p;
-			// buscar cierre de comilla
+			char* token = p; // Per acumular els caracters llegits (amb escapament)
+
+			// Trobar el final de les cometes
 			while (*p != '\0' && *p != quote) {
-				if (*p == '\\' && *(p + 1) != '\0') p += 2; // permitir escapes simples
-				else p++;
+				if (*p == '\\' && *(p + 1) != '\0') {
+					*token = *(p + 1); // Copiam el caracter escapat al token
+					p += 2; // permitir escapes simples
+				} else {
+					*token = *p; // Copiam el caracter actual
+					p++;
+				}
+
+				token++;
 			}
+
+			// Omplim de \0 entre token i p
+			while (token != p) {
+				*token = '\0';
+				token++;
+			}
+
 			if (*p == quote) {
 				*p = '\0';
 				argv[argc++] = start;
-				p++; // avanzar después de la comilla final
-			}
-			else {
-				// comilla no cerrada: tomar hasta el final
+				p++; // Avançar una posició darrera les cometes
+			} else {
+				// Si la cometa no tanca s'agafa tot el que queda
 				argv[argc++] = start;
 				break;
 			}
-		}
-		else {
+		} else {
 			char* start = p;
-			while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') p++;
+			char* token = p; // Per acumular els caracters llegits (amb escapament)
+
+			while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') {
+				if (*p == '\\' && *(p + 1) != '\0') {
+					*token = *(p + 1); // Copiam el caracter escapat al token
+					p += 2; // Es permet l'us d'espais simples
+				} else {
+					*token = *p; // Copiam el caracter actual
+					p++;
+				}
+
+				token++;
+			}
+
+			// Omplim de \0 entre token i p
+			while (token != p) {
+				*token = '\0';
+				token++;
+			}
+
 			if (*p == '#') {
-				// terminar token y descartar resto -> comentario
+				// Termina els tokens i acaba amb la resta
 				*p = '\0';
 				argv[argc++] = start;
 				break;
 			}
+
 			if (*p != '\0') {
 				*p = '\0';
 				argv[argc++] = start;
 				p++;
-			}
-			else {
+			} else {
 				argv[argc++] = start;
 				break;
 			}
 		}
 	}
 
-	argv[argc] = NULL;
+	argv[argc] = NULL; // El darrer token ha de ser NULL
 
 	for (int i = 0; i <= argc; ++i)
 		debug(DEBUG_N1, "[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
@@ -274,12 +325,13 @@ int parse_line(char* line, char** argv, int max_args) {
 	return argc;
 }
 
-// internal_cd: implementa cd sin args -> HOME, un arg, o varios (concatena y quita comillas)
+/* internal_cd: implementa cd sense args (equivalent a HOME), un arg, o varis
+   (concatena i elimina les cometes) */
 int internal_cd(char** args) {
 	char* target = NULL;
 	char cwd[LINE_MAX_LEN];
 
-	// Si no hay argumento -> HOME
+	// Si no hi ha arguments retorna a HOME
 	if (args == NULL || args[1] == NULL) {
 		target = getenv("HOME");
 		if (target == NULL) {
@@ -288,7 +340,7 @@ int internal_cd(char** args) {
 		}
 	}
 	else {
-		target = args[1];  // El parser ya devuelve la ruta completa, sin comillas
+		target = args[1]; // El parser retorna la ruta completa, sense cometes
 	}
 
 	if (chdir(target) != 0) {
@@ -296,7 +348,7 @@ int internal_cd(char** args) {
 		return 1;
 	}
 
-	// Actualizar PWD y mostrar cwd
+	// Actualitzar PWD i mostrar cwd
 	if (getcwd(cwd, sizeof(cwd)) == NULL) {
 		perror("cd");
 		return 1;
@@ -305,21 +357,22 @@ int internal_cd(char** args) {
 	debug(DEBUG_N2, "[internal_cd] %s\n", cwd);
 	if (setenv("PWD", cwd, 1) != 0) {
 		perror("cd");
-		// no abortamos, ya cambiamos de directorio
+		// No avortam, canviam de directori
 	}
 
 	return 1;
 }
 
-//internal_export: parsea NOMBRE=VALOR en args[1], muestra antes y después (modo test)
+/* internal_export: parseja NOM=VALOR en args[1], canvia el valor de la variable
+   d'entorn especificada, i mostra abans i despres (a mode de debug) */
 int internal_export(char** args) {
-	// Comprueba que se haya pasado un argumento (NOMBRE=VALOR)
+	// Comprova que se passi un argument (NOM=VALOR)
 	if (args == NULL || args[1] == NULL) {
 		fprintf(stderr, "export: correct syntax: export NAME=VALUE\n");
 		return 1;
 	}
 
-	// Separa el nombre y el valor buscando '='
+	// Separa el nom i el valor cercant '='
 	char* pair = args[1];
 	char* eq = strchr(pair, '=');
 	if (eq == NULL || eq == pair) {
@@ -327,9 +380,9 @@ int internal_export(char** args) {
 		return 1;
 	}
 
-	// Extrae el nombre de la variable
+	// Extreu el nom de la variable
 	size_t name_len = eq - pair;
-	char* name = strndup_local(pair, name_len);
+	char* name = strndup(pair, name_len);
 	if (!name) {
 		perror("");
 		return 1;
@@ -348,7 +401,7 @@ int internal_export(char** args) {
 	else
 		debug(DEBUG_N2, "[internal_export] %s was previously undefined\n", name);
 
-	// Define (o sobrescribe) la variable de entorno
+	// Defineix (o sobrescriu) la variable d'entorn
 	if (setenv(name, value, 1) != 0) {
 		perror("");
 		free(name); free(value);
@@ -361,14 +414,15 @@ int internal_export(char** args) {
 	else
 		fprintf(stderr, "export: unexpected error while reading %s\n", name);
 
-	// Libera la memoria reservada
+	// Llibera la memoria reservada
 	free(name);
 	free(value);
 	return 1;
 }
 
-// internal_source: llegeix linia per linia un fitxer, i executa cada linia
+/* internal_source: llegeix linia per linia un fitxer, i executa cada linia */
 int internal_source(char** args) {
+	// Comprovam que s'hagi passat el nom del fitxer
 	if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "source: expected file argument\n");
         return 1;
@@ -376,6 +430,7 @@ int internal_source(char** args) {
 
 	debug(DEBUG_N3, "[internal_source] reading from file %s\n", args[1]);
 
+	// Obrim el fitxer en mode lectura
 	FILE* file = fopen(args[1], "r");
 	if (file == NULL) {
 		perror("fopen");
@@ -384,6 +439,7 @@ int internal_source(char** args) {
 
 	char line[LINE_MAX_LEN];
 
+	// Llegim el fitxer línia per línia
 	while (fgets(line, LINE_MAX_LEN, file) != NULL) {
 		fflush(file);
 
@@ -399,8 +455,8 @@ int internal_source(char** args) {
 	return 1;
 }
 
-// Recorrera jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat)
-// Important formatejar bé les dades amb tabuladors i en el mateix ordre que el Job del Bash
+/* Recorr jobs_list[] imprimint per pantalla els identificadors de feina entre corchetes
+   (a partir de l'1), el seu PID, la linia de comandaments i l'estat (D de Detingut, E d'Executat) */
 int internal_jobs(char** args) {
 	debug(DEBUG_N5, "[internal_jobs] n_jobs = %d\n", n_jobs);
 
@@ -444,8 +500,7 @@ int internal_fg(char** args) {
 	jobs_list[0].cmd[LINE_MAX_LEN - 1] = '\0';
 
 	jobs_list_remove(pos); // i l'eliminam del background
-
-	print_job(0, job);
+	printf("%s\n", job.cmd);
 
 	while (jobs_list[0].pid != 0)
 		pause(); // Esperam fins que acabi el proces i sigui tractat pel reaper
@@ -454,6 +509,7 @@ int internal_fg(char** args) {
 }
 
 int internal_bg(char** args) {
+	// Comprovam que s'hagi passat el número de job
 	if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "bg: expected job number argument\n");
         return 1;
@@ -461,61 +517,63 @@ int internal_bg(char** args) {
 
 	int pos = atoi(args[1]);
 
+	// Comprovam que el job existeixi i no sigui el foreground
 	if (pos >= n_jobs || pos == 0) {
 		fprintf(stderr, "bg: no such job\n");
 		return 1;
 	}
 
-	struct info_job job = jobs_list[pos];
+	struct info_job* job = &jobs_list[pos]; // Utilitzam una referencia per poder modificar camps
 
-	if (job.status == 'E') {
+	// Si el procés ja s'està executant en background, no feim res
+	if (job->status == 'E') {
 		fprintf(stderr, "bg: job is already running in background\n");
 		return 1;
 	}
 
-	size_t cmdlen = strlen(job.cmd);
+	size_t cmdlen = strlen(job->cmd);
 
-	job.status = 'E';
+	// Canviam l'estat del job a Executant
+	job->status = 'E';
 
-	// Afegim '&' al final
+	// Afegim el símbol '&' al final de la comanda
 	if (cmdlen + 3 <= LINE_MAX_LEN) {
-		strcat(job.cmd, " &");
+		strcat(job->cmd, " &");
 	} else {
-		job.cmd[cmdlen - 1] = '&'; // Si no ens hi cap, sobreescrivim la darrera lletra
+		job->cmd[cmdlen - 1] = '&'; // Si no ens hi cap, sobreescrivim la darrera lletra
 	}
 
-	kill(job.pid, SIGCONT);
-	debug(DEBUG_N6, "[internal_bg] signal SIGCONT sent to %d (%s)\n", job.pid, job.cmd);
+	kill(job->pid, SIGCONT);
+	debug(DEBUG_N6, "[internal_bg] signal SIGCONT sent to %d (%s)\n", job->pid, job->cmd);
 
-	print_job(pos, job);
+	print_job(pos, *job);
 
 	return 1;
 }
 
 void reaper(int signum) {
-	(void)signum;  // Evita el warning de parámetro no usado (la señal recibida)
-	signal(SIGCHLD, reaper);  // Reasociamos el manejador a la señal SIGCHLD
+	signal(SIGCHLD, reaper); // Re-armar el manejador
 
 	pid_t ended;
 	int status;
 
 	debug(DEBUG_N4, "[reaper] reaper invoked, waiting for children...\n");
 
-	// Recolectamos TODOS los hijos que hayan terminado sin bloquear
+	// Recollim tots els fills que vagin terminant sense bloquetjar
 	while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
 		int pos = jobs_list_find(ended);
 
-		// Caso 1: el proceso terminó de forma normal (exit)
+		// Caso 1: el proces termina de forma normal (exit)
 		if (WIFEXITED(status)) {
 			int exitcode = WEXITSTATUS(status);
 			debug(DEBUG_N4, "[reaper] child process %d (%s) finished with exit code %d\n", ended, jobs_list[pos].cmd, exitcode);
 
-		// Caso 2: el proceso terminó por una señal
+		// Caso 2: el proces termina per un senyal
 		} else if (WIFSIGNALED(status)) {
 			int sig = WTERMSIG(status);
 			debug(DEBUG_N4, "[reaper] child process %d (%s) terminated by signal %d\n", ended, jobs_list[pos].cmd, sig);
 
-		// Caso 3: otro tipo de terminación (poco habitual)
+		// Caso 3: altre tipus de terminació (poco habitual)
 		} else {
 			debug(DEBUG_N4, "[reaper] child process %d finished (status %d)\n", ended, status);
 		}
@@ -526,7 +584,11 @@ void reaper(int signum) {
 			jobs_list[0].status = 'F';
 			jobs_list[0].cmd[0] = '\0';
 		} else {
-			// TODO: aqui que hem d'imprimir exactament?
+			if (prompt_status <= 0) {
+				putchar('\n'); // Escrivim una linia nova si fa falta
+				prompt_status = -1;
+			}
+
 			printf("child process %d (%s) ended\n", jobs_list[pos].pid, jobs_list[pos].cmd); // NO ha de ser debug, s'ha d'imprimir sempre
 
 			jobs_list_remove(pos);
@@ -537,9 +599,9 @@ void reaper(int signum) {
 }
 
 void ctrlc(int signum) {
-	(void)signum;
-	signal(SIGINT, ctrlc); // re-armar el manejador
+	signal(SIGINT, ctrlc); // Re-armar el manejador
 	putchar('\n');
+	prompt_status = -1;
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
@@ -552,7 +614,7 @@ void ctrlc(int signum) {
 
 	if (fg > 0) {
 		if (fg != me) {
-			// enviar SIGTERM al proceso foreground (no al shell)
+			// Enviar SIGTERM al procés foreground (no al shell)
 			if (kill(fg, SIGTERM) == 0)
 				debug(DEBUG_N4, "[ctrlc] signal 15 (SIGTERM) sent to %d (%s) by %d (%s)\n", fg, jobs_list[0].cmd, me, my_shell);
 			else
@@ -566,8 +628,9 @@ void ctrlc(int signum) {
 }
 
 void ctrlz(int signum) {
-	signal(SIGTSTP, ctrlz); // re-armar el manejador
+	signal(SIGTSTP, ctrlz); // Re-armar el manejador
 	putchar('\n');
+	prompt_status = -1;
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
@@ -583,8 +646,9 @@ void ctrlz(int signum) {
 			if (kill(fg, SIGSTOP) == 0) {
 				debug(DEBUG_N5, "[ctrlz] signal SIGSTOP sent to %d by %d (%s)\n", fg, me, my_shell);
 
-				// Movem el process de foreground al background
-				jobs_list_add(fg, 'D', jobs_list[0].cmd);
+				// Movem el process de foreground al background i imprimim informacio del nou job
+				int pos = jobs_list_add(fg, 'D', jobs_list[0].cmd);
+				print_job(pos, jobs_list[pos]);
 
 				// Resetejam el job numero 0 (foreground), perque execute_line finalitzi
 				// l'execucio i tornem al bucle del main
@@ -600,6 +664,8 @@ void ctrlz(int signum) {
 	}
 }
 
+// check_internal: comprova si la comanda especificada per args es interna.
+// Retorna 0 si no ho es, o un enter diferent de 0 si es intern
 int check_internal(char** args) {
 	if (args == NULL || args[0] == NULL)
 		return 0;
@@ -631,10 +697,9 @@ int check_internal(char** args) {
 
 /* Ejecuta la linea: si interno -> ya manejado, si no -> fork + execvp */
 int execute_line(char* line) {
-	int isbg = is_background(line);
-
 	char* argv[MAX_ARGS];
-	char* cmd = strdup(line);
+	char* cmd = strdup(line); // Hem de duplicar primer el cmd perque is_background el modifica
+	int isbg = is_background(line);
 	int argc = parse_line(line, argv, MAX_ARGS);
 
 	if (argc == 0) {
@@ -681,7 +746,8 @@ int execute_line(char* line) {
 		debug(DEBUG_N3, "[execute_line] fork: child PID: %d (%s)]\n", pid, cmd);
 
 		if (isbg) {
-			jobs_list_add(pid, 'E', cmd);
+			int pos = jobs_list_add(pid, 'E', cmd);
+			print_job(pos, jobs_list[pos]); // Imprimim el job
 			sigprocmask(SIG_SETMASK, &oldmask, NULL); // Permetem que el reaper actui
 		} else { // Introduim el process a la llista com a foreground
 			jobs_list[0].pid = pid;
@@ -715,6 +781,7 @@ int main(int argc, char** argv) {
 
 	strncpy(my_shell, argv[0], LINE_MAX_LEN);
 
+	// Llegim les linies de text de l'usuari
 	while (1) {
 		char line[LINE_MAX_LEN];
 		if (read_line(line, sizeof(line)) == NULL)
