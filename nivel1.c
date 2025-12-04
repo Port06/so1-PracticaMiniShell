@@ -1,3 +1,5 @@
+// Autors: Marc Xavier Arrom, Loan Besnardeau, Joshua Zien
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
