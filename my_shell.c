@@ -79,7 +79,7 @@ void print_job(int pos, struct info_job job) {
 }
 
 // jobs_list_add: intenta afegir un job al final de la llista de jobs
-// retorna 0 si s'ha pogut afegir, o -1 en cas d'error (llista plena)
+// retorna la posicio del job si s'ha pogut afegir, o -1 en cas d'error (llista plena)
 int jobs_list_add(pid_t pid, char status, char *cmd) {
 	if (n_jobs < N_JOBS) {
 		jobs_list[n_jobs].pid = pid;
@@ -88,8 +88,7 @@ int jobs_list_add(pid_t pid, char status, char *cmd) {
 		strncpy(jobs_list[n_jobs].cmd, cmd, LINE_MAX_LEN - 1);
 		jobs_list[n_jobs].cmd[LINE_MAX_LEN - 1] = '\0';
 
-		n_jobs++;
-		return 0;
+		return n_jobs++;
 	} else {
 		return -1;
 	}
@@ -637,10 +636,10 @@ int check_internal(char** args) {
 
 /* Ejecuta la linea: si interno -> ya manejado, si no -> fork + execvp */
 int execute_line(char* line) {
-	int isbg = is_background(line);
 
 	char* argv[MAX_ARGS];
-	char* cmd = strdup(line);
+	char* cmd = strdup(line); // Hem de duplicar primer el cmd perque is_background el modifica
+	int isbg = is_background(line);
 	int argc = parse_line(line, argv, MAX_ARGS);
 
 	if (argc == 0) {
@@ -687,7 +686,8 @@ int execute_line(char* line) {
 		debug(DEBUG_N3, "[execute_line] fork: child PID: %d (%s)]\n", pid, cmd);
 
 		if (isbg) {
-			jobs_list_add(pid, 'E', cmd);
+			int pos = jobs_list_add(pid, 'E', cmd);
+			print_job(pos, jobs_list[pos]); // Imprimim el job
 			sigprocmask(SIG_SETMASK, &oldmask, NULL); // Permetem que el reaper actui
 		} else { // Introduim el process a la llista com a foreground
 			jobs_list[0].pid = pid;
