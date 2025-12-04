@@ -221,53 +221,86 @@ int parse_line(char* line, char** argv, int max_args) {
 
 	while (*p != '\0' && argc < max_args - 1) {
 		// Evitar els caracters no desitjats per executar les comandes
-		while (*p == ' ' || *p == '\t' || *p == '\n') p++;
-		if (*p == '\0' || *p == '#') break;
+		while (*p == ' ' || *p == '\t' || *p == '\n')
+			p++;
+
+		if (*p == '\0' || *p == '#')
+			break;
 
 		if (*p == '"' || *p == '\'') {
 			char quote = *p++;
 			char* start = p;
+			char* token = p; // Per acumular els caracters llegits (amb escapament)
+
 			// Trobar el final de les cometes
 			while (*p != '\0' && *p != quote) {
-				if (*p == '\\' && *(p + 1) != '\0') p += 2; // permitir escapes simples
-				else p++;
+				if (*p == '\\' && *(p + 1) != '\0') {
+					*token = *(p + 1); // Copiam el caracter escapat al token
+					p += 2; // permitir escapes simples
+				} else {
+					*token = *p; // Copiam el caracter actual
+					p++;
+				}
+
+				token++;
 			}
+
+			// Omplim de \0 entre token i p
+			while (token != p) {
+				*token = '\0';
+				token++;
+			}
+
 			if (*p == quote) {
 				*p = '\0';
 				argv[argc++] = start;
 				p++; // Avançar una posició darrera les cometes
-			}
-			else {
+			} else {
 				// Si la cometa no tanca s'agafa tot el que queda
 				argv[argc++] = start;
 				break;
 			}
-		}
-		else {
+		} else {
 			char* start = p;
+			char* token = p; // Per acumular els caracters llegits (amb escapament)
+
 			while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '#') {
-				if (*p == '\\' && *(p + 1) != '\0') p += 2; // Es permet l'us d'espais simples
-				else p++;
+				if (*p == '\\' && *(p + 1) != '\0') {
+					*token = *(p + 1); // Copiam el caracter escapat al token
+					p += 2; // Es permet l'us d'espais simples
+				} else {
+					*token = *p; // Copiam el caracter actual
+					p++;
+				}
+
+				token++;
 			}
+
+			// Omplim de \0 entre token i p
+			while (token != p) {
+				*token = '\0';
+				token++;
+			}
+
 			if (*p == '#') {
 				// Termina els tokens i acaba amb la resta
 				*p = '\0';
 				argv[argc++] = start;
 				break;
 			}
+
 			if (*p != '\0') {
 				*p = '\0';
 				argv[argc++] = start;
 				p++;
-			}
-			else {
+			} else {
 				argv[argc++] = start;
 				break;
 			}
 		}
 	}
 
-	argv[argc] = NULL;
+	argv[argc] = NULL; // El darrer token ha de ser NULL
 
 	for (int i = 0; i <= argc; ++i)
 		debug(DEBUG_N1, "[parse_line] token %d: %s\n", i, argv[i] ? argv[i] : "(null)");
