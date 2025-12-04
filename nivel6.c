@@ -283,7 +283,7 @@ int internal_cd(char** args) {
 	if (args == NULL || args[1] == NULL) {
 		target = getenv("HOME");
 		if (target == NULL) {
-			fprintf(stderr, "cd: HOME no definido\n");
+			fprintf(stderr, "cd: HOME not defined\n");
 			return 1;
 		}
 	}
@@ -315,7 +315,7 @@ int internal_cd(char** args) {
 int internal_export(char** args) {
 	// Comprueba que se haya pasado un argumento (NOMBRE=VALOR)
 	if (args == NULL || args[1] == NULL) {
-		fprintf(stderr, "export: sintaxis correcta: export NOMBRE=VALOR\n");
+		fprintf(stderr, "export: correct syntax: export NAME=VALUE\n");
 		return 1;
 	}
 
@@ -323,7 +323,7 @@ int internal_export(char** args) {
 	char* pair = args[1];
 	char* eq = strchr(pair, '=');
 	if (eq == NULL || eq == pair) {
-		fprintf(stderr, "export: sintaxis correcta: export NOMBRE=VALOR\n");
+		fprintf(stderr, "export: correct syntax: export NAME=VALUE\n");
 		return 1;
 	}
 
@@ -359,7 +359,7 @@ int internal_export(char** args) {
 	if (after != NULL)
 		debug(DEBUG_N2, "[internal_export] %s=%s\n", name, after);
 	else
-		fprintf(stderr, "export: error inesperado al leer %s\n", name);
+		fprintf(stderr, "export: unexpected error while reading %s\n", name);
 
 	// Libera la memoria reservada
 	free(name);
@@ -539,11 +539,12 @@ void reaper(int signum) {
 void ctrlc(int signum) {
 	(void)signum;
 	signal(SIGINT, ctrlc); // re-armar el manejador
+	putchar('\n');
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
 
-	debug(DEBUG_N4, "\n[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
+	debug(DEBUG_N4, "[ctrlc] received by process %d (%s), foreground process is %d (%s)\n",
 		me,
 		my_shell,
 		fg,
@@ -566,11 +567,12 @@ void ctrlc(int signum) {
 
 void ctrlz(int signum) {
 	signal(SIGTSTP, ctrlz); // re-armar el manejador
+	putchar('\n');
 
 	pid_t fg = jobs_list[0].pid; // Val 0 si no hi ha foreground
 	pid_t me = getpid();
 
-	debug(DEBUG_N5, "\n[ctrlz] received by process %d (%s), foreground process is %d (%s)\n",
+	debug(DEBUG_N5, "[ctrlz] received by process %d (%s), foreground process is %d (%s)\n",
 		me,
 		my_shell,
 		fg,
