@@ -7,3 +7,4 @@ nivel6
 my_shell
 
 *.o
+.vs/*
