@@ -182,6 +182,7 @@ int is_output_redirection(char **args) {
 	int is_redir = 0;
 	char* file = NULL;
 
+	// Recorrem tots els arguments cercant el símbol '>'
 	while (*curr != NULL) {
 		if (strcmp(*curr, ">") == 0) {
 			is_redir = 1;
@@ -200,12 +201,14 @@ int is_output_redirection(char **args) {
 	if (!is_redir)
 		return 0;
 
+	// Obrim (o cream) el fitxer on s'escriurà la sortida
 	int fd = open(file, O_WRONLY | O_CREAT, 0666);
 	if (fd < 0) {
 		perror("open");
 		return 0;
 	}
 
+	// Redireccionam stdout (descriptor 1) cap al fitxer
 	if (dup2(fd, 1) < 0) {
 		perror("dup2");
 		return 0;
@@ -373,6 +376,7 @@ int internal_export(char** args) {
 
 // internal_source: llegeix linia per linia un fitxer, i executa cada llinia
 int internal_source(char** args) {
+	// Comprovam que s'hagi passat el nom del fitxer
 	if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "source: expected file argument\n");
         return 1;
@@ -380,6 +384,7 @@ int internal_source(char** args) {
 
 	debug(DEBUG_N3, "[internal_source] reading from file %s\n", args[1]);
 
+	// Obrim el fitxer en mode lectura
 	FILE* file = fopen(args[1], "r");
 	if (file == NULL) {
 		perror("fopen");
@@ -388,6 +393,7 @@ int internal_source(char** args) {
 
 	char line[LINE_MAX_LEN];
 
+	// Llegim el fitxer línia per línia
 	while (fgets(line, LINE_MAX_LEN, file) != NULL) {
 		fflush(file);
 
@@ -458,6 +464,7 @@ int internal_fg(char** args) {
 }
 
 int internal_bg(char** args) {
+	// Comprovam que s'hagi passat el número de job
 	if (args == NULL || args[1] == NULL) {
         fprintf(stderr, "bg: expected job number argument\n");
         return 1;
@@ -465,6 +472,7 @@ int internal_bg(char** args) {
 
 	int pos = atoi(args[1]);
 
+	// Comprovam que el job existeixi i no sigui el foreground
 	if (pos >= n_jobs || pos == 0) {
 		fprintf(stderr, "bg: no such job\n");
 		return 1;
@@ -472,6 +480,7 @@ int internal_bg(char** args) {
 
 	struct info_job job = jobs_list[pos];
 
+	// Si el procés ja s'està executant en background, no feim res
 	if (job.status == 'E') {
 		fprintf(stderr, "bg: job is already running in background\n");
 		return 1;
@@ -479,9 +488,10 @@ int internal_bg(char** args) {
 
 	size_t cmdlen = strlen(job.cmd);
 
+	// Canviam l'estat del job a Executant
 	job.status = 'E';
 
-	// Afegim '&' al final
+	// Afegim el símbol '&' al final de la comanda
 	if (cmdlen + 3 <= LINE_MAX_LEN) {
 		strcat(job.cmd, " &");
 	} else {
@@ -721,6 +731,7 @@ int main(int argc, char** argv) {
 
 	strncpy(my_shell, argv[0], LINE_MAX_LEN);
 
+	// Llegim les llinies de texte de l'usuari
 	while (1) {
 		char line[LINE_MAX_LEN];
 		if (read_line(line, sizeof(line)) == NULL)
