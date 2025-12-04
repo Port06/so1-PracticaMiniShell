@@ -455,8 +455,7 @@ int internal_fg(char** args) {
 	jobs_list[0].cmd[LINE_MAX_LEN - 1] = '\0';
 
 	jobs_list_remove(pos); // i l'eliminam del background
-
-	print_job(0, job);
+	printf("%s\n", job.cmd);
 
 	while (jobs_list[0].pid != 0)
 		pause(); // Esperam fins que acabi el proces i sigui tractat pel reaper
@@ -479,30 +478,30 @@ int internal_bg(char** args) {
 		return 1;
 	}
 
-	struct info_job job = jobs_list[pos];
+	struct info_job* job = &jobs_list[pos]; // Utilitzam una referencia per poder modificar camps
 
 	// Si el procés ja s'està executant en background, no feim res
-	if (job.status == 'E') {
+	if (job->status == 'E') {
 		fprintf(stderr, "bg: job is already running in background\n");
 		return 1;
 	}
 
-	size_t cmdlen = strlen(job.cmd);
+	size_t cmdlen = strlen(job->cmd);
 
 	// Canviam l'estat del job a Executant
-	job.status = 'E';
+	job->status = 'E';
 
 	// Afegim el símbol '&' al final de la comanda
 	if (cmdlen + 3 <= LINE_MAX_LEN) {
-		strcat(job.cmd, " &");
+		strcat(job->cmd, " &");
 	} else {
-		job.cmd[cmdlen - 1] = '&'; // Si no ens hi cap, sobreescrivim la darrera lletra
+		job->cmd[cmdlen - 1] = '&'; // Si no ens hi cap, sobreescrivim la darrera lletra
 	}
 
-	kill(job.pid, SIGCONT);
-	debug(DEBUG_N6, "[internal_bg] signal SIGCONT sent to %d (%s)\n", job.pid, job.cmd);
+	kill(job->pid, SIGCONT);
+	debug(DEBUG_N6, "[internal_bg] signal SIGCONT sent to %d (%s)\n", job->pid, job->cmd);
 
-	print_job(pos, job);
+	print_job(pos, *job);
 
 	return 1;
 }
@@ -597,8 +596,9 @@ void ctrlz(int signum) {
 			if (kill(fg, SIGSTOP) == 0) {
 				debug(DEBUG_N5, "[ctrlz] signal SIGSTOP sent to %d by %d (%s)\n", fg, me, my_shell);
 
-				// Movem el process de foreground al background
-				jobs_list_add(fg, 'D', jobs_list[0].cmd);
+				// Movem el process de foreground al background i imprimim informacio del nou job
+				int pos = jobs_list_add(fg, 'D', jobs_list[0].cmd);
+				print_job(pos, jobs_list[pos]);
 
 				// Resetejam el job numero 0 (foreground), perque execute_line finalitzi
 				// l'execucio i tornem al bucle del main
